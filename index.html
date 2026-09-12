@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<title>Audio sample recorder</title>
+</head>
+<body>
+<div id="root"></div>
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; }
+  .app {
+    font-family: 'Public Sans', system-ui, -apple-system, sans-serif;
+    background: #F6F4EF;
+    color: #1B2621;
+    min-height: 100vh;
+    padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
+    display: flex;
+    justify-content: center;
+  }
+  .card {
+    background: #FFFFFF;
+    border: 1px solid #DCD7C9;
+    border-radius: 10px;
+    padding: 20px;
+    max-width: 480px;
+    width: 100%;
+  }
+  h1 { font-size: 17px; margin: 0 0 4px 0; }
+  .sub { font-size: 12px; color: #8A8474; margin-bottom: 18px; font-style: italic; line-height: 1.4; }
+  label { font-size: 12px; font-weight: 700; display: block; margin-bottom: 5px; margin-top: 14px; }
+  select, input[type=text] {
+    width: 100%; font-size: 16px; padding: 12px 10px; border: 1px solid #DCD7C9;
+    border-radius: 8px; background: #F6F4EF; color: #1B2621; font-family: inherit;
+    min-height: 44px; appearance: none;
+  }
+  select {
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='%236B6455'><path d='M5 7l5 5 5-5z'/></svg>");
+    background-repeat: no-repeat; background-position: right 10px center;
+  }
+  .warn-box {
+    font-size: 12px; color: #8A6329; background: #FBF3E4; border: 1px solid #E6C98A;
+    border-radius: 8px; padding: 10px 12px; margin-top: 8px; line-height: 1.4;
+  }
+  .row { display: flex; gap: 8px; align-items: center; margin-top: 18px; flex-wrap: wrap; }
+  button {
+    font-family: inherit; font-size: 14px; padding: 12px 16px; border-radius: 8px;
+    border: none; cursor: pointer; display: flex; align-items: center; justify-content: center;
+    gap: 6px; min-height: 44px;
+  }
+  .btn-record { background: #A63D40; color: #fff; font-weight: 700; flex: 1; min-width: 100%; }
+  .btn-record.recording { background: #8A2E30; }
+  .btn-record:disabled { background: #DCD7C9; color: #8A8474; cursor: not-allowed; }
+  .btn-secondary { background: #F6F4EF; border: 1px solid #DCD7C9; color: #1B2621; }
+  .btn-download { background: #4A7A68; color: #fff; flex: 1; min-width: 100%; }
+  .status { font-size: 13px; color: #6B6455; margin-top: 12px; min-height: 18px; }
+  .status.live { color: #A63D40; font-weight: 700; }
+  audio { width: 100%; margin-top: 14px; }
+  .confirm-box {
+    font-size: 12px; color: #3D6656; background: #EEF3F0; border: 1px solid #4A7A68;
+    border-radius: 8px; padding: 10px 12px; margin-top: 10px; line-height: 1.4;
+  }
+  .filename { font-size: 11px; color: #8A8474; margin-top: 8px; word-break: break-all; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: #A63D40; display: inline-block; animation: pulse 1s infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+  .phrase-new-row { flex-wrap: wrap; }
+  .phrase-new-row input { flex: 1 1 100%; }
+  @media (max-width: 400px) {
+    .card { padding: 16px; border-radius: 0; border-left: none; border-right: none; }
+    .app { padding-left: 0; padding-right: 0; }
+    h1 { font-size: 16px; }
+  }
+</style>
+
+<script>
+// Language display name -> short code, matching the `languages` table on the Nano's Postgres DB.
+const LANGUAGES = [
+  { label: "English", code: "en" },
+  { label: "Spanish", code: "es" },
+  { label: "Hindi", code: "hi" },
+  { label: "Arabic", code: "ar" },
+  { label: "Farsi", code: "fa" },
+  { label: "Mandarin", code: "zh" },
+  { label: "Vietnamese", code: "vi" },
+  { label: "Te Reo Maori", code: "mi" },
+];
+
+// Category display name -> slug, matching `phrase_categories.value` on the Nano.
+const CATEGORIES = [
+  { label: "Intake", slug: "intake" },
+  { label: "Symptoms", slug: "symptoms" },
+  { label: "Medication / dosage", slug: "medication" },
+  { label: "Allergy", slug: "allergy" },
+  { label: "Consent", slug: "consent" },
+  { label: "Discharge", slug: "discharge" },
+  { label: "Examinations", slug: "examinations" },
+  { label: "Surgeries", slug: "surgeries" },
+  { label: "Obstetric Emergency", slug: "obstetric_emergency" },
+];
+
+// Phrases carry a stable, language-neutral key + version, matching golden_set's
+// phrase_key / version columns on the Nano. IMPORTANT: these keys (p001-p010) are
+// assigned locally in this file as placeholders — they must be confirmed against
+// whatever phrase_key values the actual golden_set migration assigns once the
+// obstetric emergency phrase bank is imported there. If they don't match, the
+// Nano's import script should flag these as unmatched rather than silently filing
+// them under the wrong ID.
+const PHRASES = {
+  obstetric_emergency: [
+    { key: "p001", version: 1, text: "The umbilical cord is compressed. We must act immediately." },
+    { key: "p002", version: 1, text: "Do you understand and consent to this emergency procedure?" },
+    { key: "p003", version: 1, text: "Please stay as still as possible for me." },
+    { key: "p004", version: 1, text: "Your baby's heart rate has dropped. This is an emergency." },
+    { key: "p005", version: 1, text: "We need to perform an emergency caesarean section right now to protect your baby." },
+    { key: "p006", version: 1, text: "We are going to give you an injection to help you and your baby." },
+    { key: "p007", version: 1, text: "Try to breathe slowly and deeply." },
+    { key: "p008", version: 1, text: "The baby is coming now, you need to push." },
+    { key: "p009", version: 1, text: "We need to monitor your baby's heartbeat continuously." },
+    { key: "p010", version: 1, text: "Is there anyone you would like us to call?" },
+  ],
+  intake: [], symptoms: [], medication: [], allergy: [], consent: [], discharge: [], examinations: [], surgeries: [],
+};
+
+const PURPOSES = [
+  { value: "asr_training", label: "ASR training (general speech)" },
+  { value: "asr_test", label: "ASR test (accuracy check)" },
+  { value: "tts_pronunciation", label: "TTS pronunciation reference" },
+];
+
+let audioContext, sourceNode, processorNode, mediaStream;
+let chunks = [];
+let recording = false;
+let startTime = 0;
+let timerInterval = null;
+let lastBlobUrl = null;
+
+function el(tag, props = {}, children = []) {
+  const e = document.createElement(tag);
+  Object.entries(props).forEach(([k, v]) => {
+    if (k === "text") e.textContent = v;
+    else if (k.startsWith("on")) e.addEventListener(k.slice(2).toLowerCase(), v);
+    else e.setAttribute(k, v);
+  });
+  children.forEach((c) => e.appendChild(c));
+  return e;
+}
+
+function buildWavBlob(samples, sampleRate) {
+  const buffer = new ArrayBuffer(44 + samples.length * 2);
+  const view = new DataView(buffer);
+  function writeString(offset, str) {
+    for (let i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i));
+  }
+  writeString(0, "RIFF");
+  view.setUint32(4, 36 + samples.length * 2, true);
+  writeString(8, "WAVE");
+  writeString(12, "fmt ");
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, 1, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * 2, true);
+  view.setUint16(32, 2, true);
+  view.setUint16(34, 16, true);
+  writeString(36, "data");
+  view.setUint32(40, samples.length * 2, true);
+  let offset = 44;
+  for (let i = 0; i < samples.length; i++, offset += 2) {
+    const s = Math.max(-1, Math.min(1, samples[i]));
+    view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7fff, true);
+  }
+  return new Blob([view], { type: "audio/wav" });
+}
+
+function slugify(s) {
+  return s.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
+}
+
+async function startRecording(ui) {
+  chunks = [];
+  mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  audioContext = new (window.AudioContext || window.webkitAudioContext)();
+  sourceNode = audioContext.createMediaStreamSource(mediaStream);
+  processorNode = audioContext.createScriptProcessor(4096, 1, 1);
+  processorNode.onaudioprocess = (e) => {
+    const input = e.inputBuffer.getChannelData(0);
+    chunks.push(new Float32Array(input));
+  };
+  sourceNode.connect(processorNode);
+  processorNode.connect(audioContext.destination);
+  recording = true;
+  startTime = Date.now();
+  ui.update();
+  timerInterval = setInterval(() => ui.update(), 200);
+}
+
+function stopRecording(ui) {
+  recording = false;
+  clearInterval(timerInterval);
+  processorNode.disconnect();
+  sourceNode.disconnect();
+  mediaStream.getTracks().forEach((t) => t.stop());
+  const totalLength = chunks.reduce((sum, c) => sum + c.length, 0);
+  const merged = new Float32Array(totalLength);
+  let offset = 0;
+  chunks.forEach((c) => { merged.set(c, offset); offset += c.length; });
+  const blob = buildWavBlob(merged, audioContext.sampleRate);
+  if (lastBlobUrl) URL.revokeObjectURL(lastBlobUrl);
+  lastBlobUrl = URL.createObjectURL(blob);
+  ui.setResult(lastBlobUrl, blob);
+  audioContext.close();
+}
+
+function App() {
+  const state = {
+    language: LANGUAGES[0],
+    category: CATEGORIES.find((c) => c.slug === "obstetric_emergency"),
+    purpose: PURPOSES[0].value,
+    phrase: null,      // { key, version, text } or null
+    newPhraseText: "",
+  };
+
+  const container = el("div", { class: "app" });
+  const card = el("div", { class: "card" });
+  container.appendChild(card);
+
+  card.appendChild(el("h1", { text: "Audio sample recorder" }));
+  card.appendChild(el("div", { class: "sub", text: "Records locally on this device. Nothing is uploaded automatically \u2014 download the WAV when you're done, then send it back for upload." }));
+
+  const langLabel = el("label", { text: "Language" });
+  const langSelect = el("select");
+  LANGUAGES.forEach((l) => langSelect.appendChild(el("option", { value: l.code, text: l.label })));
+  langSelect.addEventListener("change", (e) => {
+    state.language = LANGUAGES.find((l) => l.code === e.target.value);
+  });
+
+  const catLabel = el("label", { text: "Category" });
+  const catSelect = el("select");
+  CATEGORIES.forEach((c) => catSelect.appendChild(el("option", { value: c.slug, text: c.label })));
+  catSelect.value = state.category.slug;
+  catSelect.addEventListener("change", (e) => {
+    state.category = CATEGORIES.find((c) => c.slug === e.target.value);
+    refreshPhraseOptions();
+  });
+
+  const purposeLabel = el("label", { text: "Purpose" });
+  const purposeSelect = el("select");
+  PURPOSES.forEach((p) => purposeSelect.appendChild(el("option", { value: p.value, text: p.label })));
+  purposeSelect.addEventListener("change", (e) => (state.purpose = e.target.value));
+
+  const phraseLabel = el("label", { text: "Phrase being read" });
+  const phraseSelect = el("select");
+  const phraseNewRow = el("div", { class: "row phrase-new-row", style: "display:none;" });
+  const phraseNewInput = el("input", { type: "text", placeholder: "Type the new phrase" });
+  const phraseNewConfirm = el("button", { class: "btn-secondary", text: "Use this phrase" });
+  phraseNewRow.appendChild(phraseNewInput);
+  phraseNewRow.appendChild(phraseNewConfirm);
+
+  const newPhraseWarning = el("div", {
+    class: "warn-box",
+    style: "display:none;",
+    text: "This phrase isn't in the approved list yet, so it has no official ID \u2014 the filename will carry the phrase text itself instead. Please also add it to the phrase-collection spreadsheet so it gets a real ID and shows up here for everyone next time.",
+  });
+
+  const ADD_NEW = "__add_new__";
+
+  function refreshPhraseOptions() {
+    phraseSelect.innerHTML = "";
+    const list = PHRASES[state.category.slug] || [];
+    if (list.length === 0) {
+      phraseSelect.appendChild(el("option", { value: "", text: "(no phrases loaded yet for this category)" }));
+    } else {
+      phraseSelect.appendChild(el("option", { value: "", text: "Select a phrase..." }));
+      list.forEach((p) => phraseSelect.appendChild(el("option", { value: p.key, text: p.text })));
+    }
+    phraseSelect.appendChild(el("option", { value: ADD_NEW, text: "+ Add a new phrase..." }));
+    state.phrase = null;
+    phraseNewRow.style.display = "none";
+    newPhraseWarning.style.display = "none";
+  }
+
+  phraseSelect.addEventListener("change", (e) => {
+    if (e.target.value === ADD_NEW) {
+      phraseNewRow.style.display = "flex";
+      phraseNewInput.value = "";
+      state.phrase = null;
+      newPhraseWarning.style.display = "none";
+    } else {
+      phraseNewRow.style.display = "none";
+      const list = PHRASES[state.category.slug] || [];
+      state.phrase = list.find((p) => p.key === e.target.value) || null;
+      newPhraseWarning.style.display = "none";
+    }
+  });
+
+  phraseNewConfirm.addEventListener("click", () => {
+    const text = phraseNewInput.value.trim();
+    if (!text) return;
+    state.phrase = { key: "UNASSIGNED", version: 0, text, isNew: true };
+    state.newPhraseText = text;
+    phraseNewRow.style.display = "none";
+    newPhraseWarning.style.display = "block";
+  });
+
+  card.appendChild(langLabel); card.appendChild(langSelect);
+  card.appendChild(catLabel); card.appendChild(catSelect);
+  card.appendChild(purposeLabel); card.appendChild(purposeSelect);
+  card.appendChild(phraseLabel); card.appendChild(phraseSelect);
+  card.appendChild(phraseNewRow); card.appendChild(newPhraseWarning);
+
+  const row = el("div", { class: "row" });
+  const recordBtn = el("button", { class: "btn-record" });
+  const status = el("div", { class: "status" });
+  const audioPreview = el("audio", { controls: "true", style: "display:none" });
+  const confirmBox = el("div", { class: "confirm-box", style: "display:none;" });
+  const filenameNote = el("div", { class: "filename" });
+  const downloadRow = el("div", { class: "row" });
+  const downloadBtn = el("button", { class: "btn-download" });
+  downloadBtn.innerHTML = "Download WAV";
+  downloadRow.style.display = "none";
+
+  card.appendChild(row);
+  row.appendChild(recordBtn);
+  card.appendChild(status);
+  card.appendChild(audioPreview);
+  card.appendChild(confirmBox);
+  card.appendChild(filenameNote);
+  card.appendChild(downloadRow);
+  downloadRow.appendChild(downloadBtn);
+
+  const ui = {
+    update() {
+      if (recording) {
+        const secs = ((Date.now() - startTime) / 1000).toFixed(1);
+        recordBtn.className = "btn-record recording";
+        recordBtn.innerHTML = "&#9632; Stop recording";
+        status.className = "status live";
+        status.innerHTML = '<span class="dot"></span> Recording... ' + secs + "s";
+      } else {
+        recordBtn.className = "btn-record";
+        recordBtn.innerHTML = "&#9679; Start recording";
+        status.className = "status";
+      }
+    },
+    setResult(url, blob) {
+      status.textContent = "Recording complete. Listen back before downloading:";
+      audioPreview.src = url;
+      audioPreview.style.display = "block";
+
+      const p = state.phrase;
+      const phraseIdPart = p ? (p.isNew ? "UNASSIGNED_" + slugify(p.text).slice(0, 40) : (p.key + "v" + p.version)) : "NOPHRASE";
+      const fname = [phraseIdPart, state.language.code, state.category.slug, state.purpose, Date.now()].join("_") + ".wav";
+
+      confirmBox.style.display = "block";
+      confirmBox.textContent = p
+        ? "Confirm the recording matches: \u201c" + p.text + "\u201d"
+        : "No phrase was selected \u2014 pick one above before recording next time so this file can be matched automatically.";
+
+      filenameNote.textContent = "Filename: " + fname;
+      downloadRow.style.display = "flex";
+      downloadBtn.onclick = () => {
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = fname;
+        a.click();
+      };
+    },
+  };
+
+  recordBtn.addEventListener("click", async () => {
+    if (!recording) {
+      try {
+        await startRecording(ui);
+      } catch (err) {
+        status.textContent = "Microphone access denied or unavailable.";
+      }
+    } else {
+      stopRecording(ui);
+    }
+  });
+
+  ui.update();
+  refreshPhraseOptions();
+  return container;
+}
+
+document.getElementById("root").appendChild(App());
+</script>
+</body>
+</html>
