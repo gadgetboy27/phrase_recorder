@@ -1,8 +1,8 @@
 # Phrase Recorder
 
 Mobile-friendly tool for collecting phrase audio (native/fluent speaker
-recordings) for the local medical interpreter project. Deployed as a static
-site via Cloudflare Pages.
+recordings) for the local medical interpreter project, plus the tools that
+carry those recordings from a volunteer's phone to the Jetson Nano.
 
 ## Full context
 
@@ -12,36 +12,82 @@ consent rules, iOS deployment plan, and the Jetson Nano Postgres setup.
 Read that before making structural changes here; this README is only an
 orientation pointer, not a substitute for it.
 
-## Current state
+[`docs/data-contract.md`](./docs/data-contract.md) is the contract every
+piece below conforms to (audio format, phrase IDs, filename, manifest, zip
+layout, staging layout, Nano rows). Change it there first.
 
-- `public/index.html` — the recorder itself. Records locally in-browser (no
-  backend yet), builds a WAV with a filename encoding phrase ID + version,
-  language, category, and purpose, matching the schema on the Nano's
-  Postgres database (see brief §16 for the schema, §12–13 for background
-  on why phrase IDs are versioned).
-- Deployed via Cloudflare Pages (project `phrase-recorder`, output dir
-  `public/`), connected to this repo — push to `main`
-  and it deploys automatically.
-- No API yet. The phrase list is hardcoded in `public/index.html`; recordings are
-  downloaded manually and transferred to the Nano via `scp`.
+## The pipeline
+
+```
+volunteer's phone ──► batch.zip ──► Mac ──────────────────► Nano
+  public/index.html    AirDrop /    tools/ingest.py         tools/push.py
+  record, listen,      share sheet  validate + stage        rsync files
+  accept, export                    (your QC gate)          INSERT audio_samples
+```
+
+| Piece | Path | What it does |
+|---|---|---|
+| Recorder | `public/index.html` | Static page on Cloudflare Pages. Volunteer picks language, speaker ID, consent; steps through a category's phrases; each accepted take is a 16-bit mono WAV at the device's native rate. Takes persist in IndexedDB. **Export batch** builds one zip (WAVs + `manifest.json`) and opens the share sheet (AirDrop on iPhone) or downloads it. |
+| Phrase list | `public/phrases.json` | Languages, categories, and phrases (`key` + `version`, language-neutral). The recorder fetches this; the Nano's `phrases` table is seeded with the same rows. |
+| Ingest | `tools/ingest.py` | On the Mac. Verifies every WAV against the manifest (SHA-256, size, header, duration) and the phrase list, stages good batches under `~/phrase-recordings/staged/`, files failures under `rejected/` with a report. |
+| Push | `tools/push.py` | rsyncs a staged batch to the Nano and inserts `audio_samples` rows. Dedupes on SHA-256 so re-pushing is harmless. Unknown phrase keys are filed as unmatched and printed, never guessed. |
+| Schema | `nano/migrations/` + `nano/apply.sh` | Idempotent migrations on top of the brief's §16 schema. `001` adds the `phrases` table and the recording metadata columns. |
+
+## Setup
+
+**Nano (once):** after the §16 setup, apply the migration:
+
+```bash
+PG_DSN="postgresql://interpreter_app:PASSWORD@localhost:5432/interpreter_data" nano/apply.sh
+sudo mkdir -p /srv/phrase-recordings && sudo chown $USER /srv/phrase-recordings
+```
+
+**Mac (once):**
+
+```bash
+brew install libpq && brew link --force libpq     # psql
+export NANO_DEST=nano@nano.local:/srv/phrase-recordings
+export PG_DSN="postgresql://interpreter_app:PASSWORD@nano.local:5432/interpreter_data"
+```
+
+## Day-to-day
+
+1. Volunteer opens https://phrase-recorder.pages.dev on their phone, records,
+   taps **Export batch**, AirDrops the zip to the Mac.
+2. `tools/ingest.py ~/Downloads` — validates everything in the folder. Listen
+   to anything in `~/phrase-recordings/staged/<batch>/` you want to check;
+   delete a WAV from the staged manifest if it shouldn't go up.
+3. `tools/push.py --all` — files to the Nano, rows into Postgres, batch moved
+   to `pushed/`.
+4. Tell the volunteer it arrived so they can clear the batch on their phone.
+
+`tools/push.py --all --dry-run` shows the rsync command and SQL without doing
+anything.
+
+## Deploy
+
+Cloudflare Pages project `phrase-recorder`, connected to this repo. Push to
+`main` → production; any other branch → preview URL. Output dir is `public/`
+so `docs/`, `tools/`, `nano/` are never published.
 
 ## What's next (not yet built)
 
-1. A small API on the Nano (FastAPI) — `GET /phrases`, `POST /phrases`,
-   `POST /recordings` — reading and writing the existing Postgres schema.
-2. A Cloudflare Tunnel exposing that API to this frontend without opening
-   the Nano's network to the internet.
-3. Swap `public/index.html`'s hardcoded phrase list for a live fetch from the
-   API, and add a real upload flow in place of the download button.
+The Mac hop exists so the Nano's network never has to be opened up and so
+there's a human QC step. When that's no longer the bottleneck:
 
-Full step-by-step breakdown of this sequence is in the project brief.
+1. FastAPI on the Nano — `GET /phrases`, `POST /recordings` — accepting
+   exactly the manifest + files the zip contains, reusing `ingest.py`'s
+   validation.
+2. Cloudflare Tunnel (+ Access) in front of it.
+3. Recorder swaps `phrases.json` for `GET /phrases` and gains an **Upload**
+   button next to **Export**.
 
 ## Don't rebuild what's already decided
 
-A few things were deliberately settled during design — check the brief
-before re-deciding them:
 - Phrase IDs are language-neutral and versioned (`p005v1`), not per-language.
-- Postgres is the source of truth; any exported file (e.g. `manifest.json`)
-  is generated from it, never the other way round.
+- Postgres on the Nano is the source of truth; `phrases.json` is a copy of it
+  until the API exists, never the other way round.
+- WAV stays lossless end to end. Derived formats (16 kHz, FLAC) are produced
+  on the Mac/Nano, never in the browser.
 - Nothing patient-adjacent goes through a managed cloud service — the
   database stays self-hosted, on your own hardware, always.
