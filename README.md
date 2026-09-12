@@ -14,14 +14,15 @@ orientation pointer, not a substitute for it.
 
 ## Current state
 
-- `index.html` — the recorder itself. Records locally in-browser (no
+- `public/index.html` — the recorder itself. Records locally in-browser (no
   backend yet), builds a WAV with a filename encoding phrase ID + version,
   language, category, and purpose, matching the schema on the Nano's
   Postgres database (see brief §16 for the schema, §12–13 for background
   on why phrase IDs are versioned).
-- Deployed via Cloudflare Pages, connected to this repo — push to `main`
+- Deployed via Cloudflare Pages (project `phrase-recorder`, output dir
+  `public/`), connected to this repo — push to `main`
   and it deploys automatically.
-- No API yet. The phrase list is hardcoded in `index.html`; recordings are
+- No API yet. The phrase list is hardcoded in `public/index.html`; recordings are
   downloaded manually and transferred to the Nano via `scp`.
 
 ## What's next (not yet built)
@@ -30,7 +31,7 @@ orientation pointer, not a substitute for it.
    `POST /recordings` — reading and writing the existing Postgres schema.
 2. A Cloudflare Tunnel exposing that API to this frontend without opening
    the Nano's network to the internet.
-3. Swap `index.html`'s hardcoded phrase list for a live fetch from the
+3. Swap `public/index.html`'s hardcoded phrase list for a live fetch from the
    API, and add a real upload flow in place of the download button.
 
 Full step-by-step breakdown of this sequence is in the project brief.
