@@ -34,7 +34,9 @@ volunteer's phone ──► batch.zip ──► Mac ─────────�
 | Push | `tools/push.py` | rsyncs a staged batch to the Nano and inserts `audio_samples` rows. Dedupes on SHA-256 so re-pushing is harmless. Unknown phrase keys are filed as unmatched and printed, never guessed. Typed translations become draft `golden_set` rows linked to their recordings. |
 | Add phrases | `tools/add_phrase.py` | `--category intake "…"` adds the next key; `--revise p003 "…"` adds a new version. Refreshes `phrases.json` for you. |
 | Review translations | `tools/translations.py` | `list` drafts, `play` a draft's recording on the Nano, `approve` / `reject`, or `set p003 mi "…"` to enter one directly. |
-| Schema | `nano/migrations/` + `nano/apply.sh` | Idempotent migrations on top of the brief's §16 schema. `001` adds the `phrases` table and the recording metadata columns. |
+| Bench | `tools/bench.py` | The bake-off number. For every approved translation: trims each linked recording to its speech (Silero VAD) and resamples to 16 kHz on the Nano — the original WAV is untouched — transcribes it with whisper-cli, asks the Nano's llama-server to translate the English, and scores both against the approved text (CER/WER, with and without macrons). Report under `~/phrase-recordings/bench/`; derived file + speech boundaries recorded on `audio_samples`. |
+| Nano worker | `nano/asr_worker.py` | The half of bench that runs on the Nano (copied over by `bench.py`). Uses `~/whisper.cpp` (CUDA build, `ggml-large-v3-turbo-q5_0.bin`, `ggml-silero-v6.2.0.bin`), sox, and the llama-server on `127.0.0.1:8080`. |
+| Schema | `nano/migrations/` + `nano/apply.sh` | Idempotent migrations on top of the brief's §16 schema. `001` adds the `phrases` table and the recording metadata columns; `002` translations; `003` derived-audio columns. |
 
 ## Setup
 
@@ -74,6 +76,12 @@ export PG_DSN="postgresql://interpreter_app@192.168.68.111:5432/interpreter_data
 
 `tools/push.py --all --dry-run` shows the rsync command and SQL without doing
 anything.
+
+**Scoring the models:** `tools/bench.py --lang mi` after any push or approval.
+Every recording is trimmed + resampled into `<batch>/derived/16k-trim/` on
+the Nano (roughly a quarter of the original size); that copy is what
+Whisper — and later fine-tuning — reads. `--model` swaps the Whisper model,
+`--no-translate` skips the LLM, `--force` re-trims.
 
 **Adding phrases:** `tools/add_phrase.py --category intake "What is your
 date of birth?"` then commit and push `public/phrases.json`.
