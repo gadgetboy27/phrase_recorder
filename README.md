@@ -31,7 +31,9 @@ volunteer's phone ──► batch.zip ──► Mac ─────────�
 | Phrase list | `public/phrases.json` | Languages, categories, and phrases (`key` + `version`, language-neutral). The recorder fetches this. Generated from the Nano's tables by `tools/export_phrases.py` — never edit by hand. |
 | Ingest | `tools/ingest.py` | On the Mac. Verifies every WAV against the manifest (SHA-256, size, header, duration) and the phrase list, stages good batches under `~/phrase-recordings/staged/`, files failures under `rejected/` with a report. |
 | Phrase sync | `tools/export_phrases.py` | Regenerates `public/phrases.json` from the Nano's `phrases`, `phrase_categories`, and `languages` tables. `--check` reports whether the file is stale without writing. |
-| Push | `tools/push.py` | rsyncs a staged batch to the Nano and inserts `audio_samples` rows. Dedupes on SHA-256 so re-pushing is harmless. Unknown phrase keys are filed as unmatched and printed, never guessed. |
+| Push | `tools/push.py` | rsyncs a staged batch to the Nano and inserts `audio_samples` rows. Dedupes on SHA-256 so re-pushing is harmless. Unknown phrase keys are filed as unmatched and printed, never guessed. Typed translations become draft `golden_set` rows linked to their recordings. |
+| Add phrases | `tools/add_phrase.py` | `--category intake "…"` adds the next key; `--revise p003 "…"` adds a new version. Refreshes `phrases.json` for you. |
+| Review translations | `tools/translations.py` | `list` drafts, `play` a draft's recording on the Nano, `approve` / `reject`, or `set p003 mi "…"` to enter one directly. |
 | Schema | `nano/migrations/` + `nano/apply.sh` | Idempotent migrations on top of the brief's §16 schema. `001` adds the `phrases` table and the recording metadata columns. |
 
 ## Setup
@@ -41,7 +43,8 @@ are created as `postgres`) and make the recordings directory:
 
 ```bash
 sudo -u postgres psql -d interpreter_data -c 'ALTER TABLE languages OWNER TO interpreter_app; ALTER TABLE phrase_categories OWNER TO interpreter_app; ALTER TABLE golden_set OWNER TO interpreter_app; ALTER TABLE corrections OWNER TO interpreter_app; ALTER TABLE training_runs OWNER TO interpreter_app; ALTER TABLE dataset_snapshots OWNER TO interpreter_app; ALTER TABLE prompt_versions OWNER TO interpreter_app; ALTER TABLE audio_samples OWNER TO interpreter_app;'
-sudo mkdir -p /srv/phrase-recordings && sudo chown $USER /srv/phrase-recordings
+mkdir -p ~/phrase-recordings                 # where pushed batches land
+amixer -c 0 sset Speaker 100% && sudo alsactl store   # USB speaker volume, persisted
 ```
 
 Migrations then run from the Mac as `interpreter_app`: `nano/apply.sh`
@@ -51,7 +54,8 @@ Migrations then run from the Mac as `interpreter_app`: `nano/apply.sh`
 
 ```bash
 brew install libpq && brew link --force libpq     # psql
-export NANO_DEST=gadgetboy@192.168.68.111:/srv/phrase-recordings
+export NANO_DEST=gadgetboy@192.168.68.111:/home/gadgetboy/phrase-recordings
+export NANO_SSH=gadgetboy@192.168.68.111
 export PG_DSN="postgresql://interpreter_app@192.168.68.111:5432/interpreter_data"
 # password goes in ~/.pgpass (chmod 600), never in the DSN or the repo:
 #   192.168.68.111:5432:interpreter_data:interpreter_app:PASSWORD
@@ -71,9 +75,16 @@ export PG_DSN="postgresql://interpreter_app@192.168.68.111:5432/interpreter_data
 `tools/push.py --all --dry-run` shows the rsync command and SQL without doing
 anything.
 
-**Adding phrases:** insert rows into `phrases` on the Nano (`phrase_key`,
-`version`, `category`, `canonical_text`), then `tools/export_phrases.py`,
-commit, push. The deployed recorder shows them on next load.
+**Adding phrases:** `tools/add_phrase.py --category intake "What is your
+date of birth?"` then commit and push `public/phrases.json`.
+
+**Translations:** a non-English volunteer sees the approved translation to
+read if one exists; otherwise the English plus an optional box to type
+their translation. Typed ones arrive as drafts — `tools/translations.py
+list`, listen with `play <id>`, then `approve <id>`, then
+`tools/export_phrases.py`, commit, push. From then on every volunteer
+reads the same approved text. A blank box never stores the English as the
+translation; the recording is kept and the text can be added later.
 
 ## Deploy
 

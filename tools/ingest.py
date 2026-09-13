@@ -33,6 +33,7 @@ DEFAULT_PHRASES = REPO / "public" / "phrases.json"
 
 PURPOSES = {"asr_training", "asr_test", "tts_pronunciation"}
 SPEAKER_TYPES = {"native", "fluent", "learner", "staff"}
+TRANSLATION_SOURCES = {"canonical", "approved", "typed"}
 SPEAKER_ID_RE = re.compile(r"^[a-z0-9]{2,12}$")
 FILE_RE = re.compile(r"^[A-Za-z0-9_.-]+\.wav$")
 DURATION_TOLERANCE_MS = 50
@@ -73,6 +74,10 @@ def check_manifest(m, lists):
         raise Problem("manifest has no recordings")
 
 
+def m_lang(lists):
+    return lists.get("_batch_language")
+
+
 def check_recording(r, data, lists):
     """Per-recording validation. Returns (errors, warnings)."""
     errors, warnings = [], []
@@ -87,6 +92,16 @@ def check_recording(r, data, lists):
         errors.append("take must be a positive integer")
     if not r.get("phrase_text", "").strip():
         errors.append("phrase_text empty")
+    # v2.1: what was read, and where that text came from (both optional, must agree).
+    rt, src = r.get("read_text"), r.get("translation_source")
+    if src is not None and src not in TRANSLATION_SOURCES:
+        errors.append(f"translation_source {src!r} invalid")
+    if (rt is None) != (src is None):
+        errors.append("read_text and translation_source must both be set or both be null")
+    if rt is not None and not str(rt).strip():
+        errors.append("read_text is blank")
+    if rt is None and m_lang(lists) != "en" and not r.get("unmatched"):
+        warnings.append("no translation text — transcript can be added on the Nano later")
 
     if r.get("unmatched"):
         if r.get("phrase_key") is not None:
@@ -150,6 +165,7 @@ def ingest_zip(zpath, root, lists, derive, force):
             return reject_whole(root, zpath, f"manifest invalid: {e}", None)
 
         batch_id = m["batch_id"]
+        lists["_batch_language"] = m["language"]
         staged = root / "staged" / batch_id
         pushed = root / "pushed" / batch_id
         if pushed.exists():

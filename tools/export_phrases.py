@@ -8,7 +8,8 @@
 Postgres is the source of truth (docs/data-contract.md §2). After adding or
 editing rows in `phrases`, `phrase_categories`, or `languages` on the Nano,
 run this, then commit and push so the deployed recorder picks it up.
-Only `status = 'active'` phrases are exported. Stdlib only; needs psql.
+Only `status = 'active'` phrases are exported, each with its approved
+translations per target language from golden_set. Stdlib only; needs psql.
 """
 import argparse
 import json
@@ -28,10 +29,14 @@ SELECT json_build_object(
                  FROM phrase_categories),
   'languages',  (SELECT coalesce(json_agg(json_build_object('code', code, 'label', label) ORDER BY label), '[]')
                  FROM languages),
-  'phrases',    (SELECT coalesce(json_agg(json_build_object('key', phrase_key, 'version', version,
-                                                            'category', category, 'text', canonical_text)
-                                          ORDER BY phrase_key, version), '[]')
-                 FROM phrases WHERE status = 'active')
+  'phrases',    (SELECT coalesce(json_agg(json_build_object(
+                    'key', p.phrase_key, 'version', p.version, 'category', p.category, 'text', p.canonical_text,
+                    'translations', (SELECT coalesce(json_object_agg(split_part(g.language_pair, '-', 2), g.approved_translation), '{}')
+                                     FROM golden_set g
+                                     WHERE (g.phrase_key, g.phrase_version) = (p.phrase_key, p.version)
+                                       AND g.status = 'approved' AND g.language_pair LIKE 'en-%'))
+                  ORDER BY p.phrase_key, p.version), '[]')
+                 FROM phrases p WHERE p.status = 'active')
 )
 """
 
@@ -61,7 +66,8 @@ def main():
     new = render(data)
     out = Path(a.out)
     old = out.read_text() if out.exists() else None
-    summary = f"{len(data['phrases'])} phrases, {len(data['categories'])} categories, {len(data['languages'])} languages"
+    n_tr = sum(len(p["translations"]) for p in data["phrases"])
+    summary = f"{len(data['phrases'])} phrases, {n_tr} approved translations, {len(data['categories'])} categories, {len(data['languages'])} languages"
 
     if old is not None and json.loads(old) == data:
         print(f"{out.relative_to(REPO) if out.is_relative_to(REPO) else out} is up to date ({summary})")

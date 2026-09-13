@@ -38,6 +38,20 @@ volunteer's phone ──► batch.zip ──► Mac (tools/ingest.py) ──► 
   `phrase_key = NULL` and `unmatched_phrase_text` set. **Nothing ever
   guesses a key.**
 
+## 2a. Translations
+
+- `golden_set` holds translation text per phrase per language pair
+  (`en-mi`, `en-es`, …), keyed to `phrases` by `phrase_key` + `version`.
+  Exactly one row per phrase/pair may be `approved`; others are `draft`,
+  `rejected`, or `superseded`.
+- `export_phrases.py` puts approved translations into `phrases.json`
+  (`phrases[].translations = {"mi": "…"}`). The recorder shows the approved
+  target-language text to the volunteer when one exists; otherwise it shows
+  the English and offers an optional box to type the translation.
+- `push.py` turns typed translations into draft rows (exact duplicates
+  collapse) and links each recording to its row via
+  `audio_samples.linked_golden_set_id`. Review with `tools/translations.py`.
+
 ## 3. Speaker identity and consent
 
 - `speaker_id`: 2–12 chars, lower-case letters/digits, chosen by the
@@ -68,7 +82,7 @@ One per batch. A batch is one speaker, one language, one export.
 ```json
 {
   "manifest_version": 1,
-  "app_version": "2.0.0",
+  "app_version": "2.1.0",
   "batch_id": "20260913T101500Z_mg_es_a1b2c3",
   "exported_at": "2026-09-13T10:15:00.000Z",
   "language": "es",
@@ -92,6 +106,8 @@ One per batch. A batch is one speaker, one language, one export.
       "category": "obstetric_emergency",
       "purpose": "asr_training",
       "take": 2,
+      "read_text": "Necesitamos hacer una cesárea de emergencia ahora mismo para proteger a su bebé.",
+      "translation_source": "approved",
       "sample_rate": 48000,
       "duration_ms": 4120,
       "bytes": 395564,
@@ -112,6 +128,12 @@ Rules:
 - `language` ∈ `languages.code`.
 - For `unmatched: true` recordings, `phrase_key`/`phrase_version` are
   `null` and `phrase_text` is the text the volunteer typed.
+- `read_text` is what the speaker actually read; `translation_source` says
+  where it came from: `canonical` (English session — the phrase itself),
+  `approved` (the approved translation from `phrases.json`), `typed` (the
+  volunteer typed it — becomes a *draft* `golden_set` row on push). Both are
+  `null` when a non-English volunteer recorded without typing anything.
+  **Never the English text standing in for a translation.**
 
 ## 6. ZIP layout
 
@@ -137,7 +159,7 @@ browser-side zip writer dependency-free.
 
 ## 8. Nano
 
-- Files: `/srv/phrase-recordings/<batch_id>/…` (rsync'd verbatim).
+- Files: `~/phrase-recordings/<batch_id>/…` on the Nano (rsync'd verbatim).
 - Rows: one `audio_samples` row per recording, `file_ref` =
   `<batch_id>/<file>`. Columns map 1:1 to the manifest fields above.
 - `phrases` table is the source of truth for keys. If a manifest claims a
@@ -153,4 +175,6 @@ browser-side zip writer dependency-free.
 | Phrase list | `public/phrases.json` |
 | Mac ingest (validates, stages) | `tools/ingest.py` |
 | Nano push (rsync + INSERT) | `tools/push.py` |
-| Schema | `nano/migrations/001_phrases_and_audio_metadata.sql` |
+| Phrase sync (DB → json) | `tools/export_phrases.py`, `tools/add_phrase.py` |
+| Translation review | `tools/translations.py` |
+| Schema | `nano/migrations/` |

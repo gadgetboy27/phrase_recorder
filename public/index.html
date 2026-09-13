@@ -32,7 +32,7 @@
   h2 { font-size: 14px; margin: 18px 0 6px 0; }
   .sub { font-size: 12px; color: #8A8474; margin-bottom: 18px; font-style: italic; line-height: 1.4; }
   label { font-size: 12px; font-weight: 700; display: block; margin-bottom: 5px; margin-top: 14px; }
-  select, input[type=text] {
+  select, input[type=text], textarea {
     width: 100%; font-size: 16px; padding: 12px 10px; border: 1px solid #DCD7C9;
     border-radius: 8px; background: #F6F4EF; color: #1B2621; font-family: inherit;
     min-height: 44px; appearance: none;
@@ -42,6 +42,9 @@
     background-repeat: no-repeat; background-position: right 10px center;
   }
   select:disabled, input:disabled { color: #8A8474; }
+  textarea { min-height: 72px; resize: vertical; line-height: 1.4; }
+  .phrase-source { font-size: 13px; color: #6B6455; margin: 6px 2px 0 2px; line-height: 1.4; }
+  .phrase-source b { color: #2E4A40; font-weight: 600; }
   .hint { font-size: 11px; color: #8A8474; margin-top: 4px; line-height: 1.4; }
   .warn-box {
     font-size: 12px; color: #8A6329; background: #FBF3E4; border: 1px solid #E6C98A;
@@ -117,7 +120,7 @@
 <script>
 // Phrase recorder v2 — see docs/data-contract.md. Everything this file
 // produces (WAV, filename, manifest.json, zip) is specified there.
-const APP_VERSION = "2.0.0";
+const APP_VERSION = "2.1.0";
 const MANIFEST_VERSION = 1;
 const CONSENT_TEXT_VERSION = 1;
 const CONSENT_TEXT =
@@ -394,6 +397,20 @@ function buildZip(entries) {
 function phraseIdPart(meta) {
   return meta.unmatched ? "UNASSIGNED_" + slugify(meta.phrase_text).slice(0, 40) : meta.phrase_key + "v" + meta.phrase_version;
 }
+function phraseId(p) { return p.unmatched ? "adhoc:" + p.text : p.key + "v" + p.version; }
+function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;"); }
+// How the phrase should be presented for this language:
+//   canonical – English session: read the phrase as written
+//   adhoc     – volunteer-added phrase: read what they typed
+//   approved  – an approved translation exists: read that
+//   ask       – no translation yet: read the English, optionally type the translation
+function readMode(p, lang) {
+  if (p.unmatched) return { kind: "adhoc" };
+  if (lang === "en") return { kind: "canonical" };
+  const t = (p.translations || {})[lang];
+  return t ? { kind: "approved", text: t } : { kind: "ask" };
+}
+
 async function buildBatch(settings, takes) {
   const exportedAt = new Date();
   const batchId = compactUtc(exportedAt) + "_" + settings.speakerId + "_" + settings.language + "_" +
@@ -443,6 +460,7 @@ async function App(root) {
     sessionPhrases: [],   // [{ key, version, text, category, unmatched }]
     idx: 0,
     pending: null,        // { blob, sampleRate, durationMs, recordedAt } awaiting accept
+    typed: {},            // phraseId -> translation typed this session (so take 2 needn't retype)
     pendingUrl: null,
     timer: null,
     // batch screen
@@ -540,7 +558,7 @@ async function App(root) {
   function startSession() {
     const cat = state.settings.category;
     state.sessionPhrases = phraseData.phrases.filter((p) => p.category === cat)
-      .map((p) => ({ key: p.key, version: p.version, text: p.text, category: cat, unmatched: false }));
+      .map((p) => ({ key: p.key, version: p.version, text: p.text, category: cat, unmatched: false, translations: p.translations || {} }));
     state.idx = 0;
     discardPending();
     state.screen = "record";
@@ -563,6 +581,8 @@ async function App(root) {
     if (!state.sessionPhrases.length) startSessionPhrasesOnly();
     const p = state.sessionPhrases[state.idx];
     const catLabel = (phraseData.categories.find((c) => c.slug === s.category) || {}).label || s.category;
+    const langLabel = (phraseData.languages.find((l) => l.code === s.language) || {}).label || s.language.toUpperCase();
+    const mode = p ? readMode(p, s.language) : { kind: "none" };
 
     card.appendChild(el("div", { class: "session-bar" }, [
       el("span", { class: "meta", text: s.language.toUpperCase() + " · " + s.speakerId + " · " + catLabel }),
@@ -575,9 +595,27 @@ async function App(root) {
     } else {
       const existing = takesFor(p).length;
       card.appendChild(el("div", { class: "progress", text: "Phrase " + (state.idx + 1) + " of " + state.sessionPhrases.length + (existing ? " · " + existing + " take" + (existing > 1 ? "s" : "") + " saved" : "") }));
-      card.appendChild(el("div", { class: "phrase-text", text: p.text }));
-      card.appendChild(el("div", { class: "phrase-key", text: p.unmatched ? "Not in the approved list — will be exported as UNASSIGNED" : p.key + " v" + p.version }));
+      if (mode.kind === "approved") {
+        // Approved target-language text exists: read that; English shown for reference.
+        card.appendChild(el("div", { class: "phrase-text", lang: s.language, text: mode.text }));
+        card.appendChild(el("div", { class: "phrase-source", html: "<b>English:</b> " + esc(p.text) }));
+      } else {
+        card.appendChild(el("div", { class: "phrase-text", text: p.text }));
+      }
+      card.appendChild(el("div", { class: "phrase-key", text: p.unmatched ? "Not in the approved list — will be exported as UNASSIGNED" : p.key + " v" + p.version + (mode.kind === "approved" ? " · approved " + langLabel + " translation" : "") }));
     }
+
+    // Non-English, no approved translation yet: let the volunteer type what they'll read.
+    const translationBox = el("div", { style: mode.kind === "ask" ? "" : "display:none" });
+    const translationInput = el("textarea", { placeholder: "Type the " + langLabel + " you're about to say (optional)" });
+    if (mode.kind === "ask") {
+      translationInput.value = state.typed[phraseId(p)] || (takesFor(p).slice(-1)[0] || { meta: {} }).meta.read_text || "";
+      translationBox.appendChild(el("label", { text: "Your " + langLabel + " translation" }));
+      translationBox.appendChild(translationInput);
+      translationBox.appendChild(el("div", { class: "hint", text: "This becomes a draft translation for review. Leave it blank if you'd rather not type — the recording is still saved and the text can be added later." }));
+      translationInput.addEventListener("input", () => { state.typed[phraseId(p)] = translationInput.value; });
+    }
+    card.appendChild(translationBox);
 
     const recordBtn = el("button", { class: "btn-record", disabled: !p });
     const status = el("div", { class: "status" });
@@ -649,7 +687,8 @@ async function App(root) {
         audioPreview.src = state.pendingUrl; audioPreview.style.display = "block";
         status.textContent = "Listen back, then accept or redo.";
         confirmBox.style.display = "block";
-        confirmBox.textContent = "Check it matches: “" + p.text + "”  (" + fmtSecs(result.durationMs) + ", " + result.sampleRate + " Hz)";
+        const said = mode.kind === "approved" ? mode.text : (mode.kind === "ask" && translationInput.value.trim()) || p.text;
+        confirmBox.textContent = "Check it matches: “" + said + "”  (" + fmtSecs(result.durationMs) + ", " + result.sampleRate + " Hz)";
         acceptRow.style.display = "flex";
       }
     });
@@ -663,8 +702,15 @@ async function App(root) {
       const take = takesFor(p).length + 1;
       const base = { phrase_key: p.unmatched ? null : p.key, phrase_version: p.unmatched ? null : p.version, phrase_text: p.text, unmatched: p.unmatched };
       const file = [phraseIdPart(base), s.language, p.category, s.purpose, s.speakerId, "t" + take, r.recordedAt.getTime()].join("_") + ".wav";
+      // What was actually read. Never the English by default for a non-English take.
+      let read_text = null, translation_source = null;
+      if (mode.kind === "canonical") { read_text = p.text; translation_source = "canonical"; }
+      else if (mode.kind === "approved") { read_text = mode.text; translation_source = "approved"; }
+      else if (mode.kind === "ask" && translationInput.value.trim()) { read_text = translationInput.value.trim(); translation_source = "typed"; }
+      else if (mode.kind === "adhoc") { read_text = p.text; translation_source = "typed"; }
       const meta = {
         file, ...base, category: p.category, purpose: s.purpose, take,
+        read_text, translation_source,
         sample_rate: r.sampleRate, duration_ms: r.durationMs, bytes: r.blob.size,
         sha256: await sha256Hex(r.blob), recorded_at: r.recordedAt.toISOString(),
       };
@@ -696,7 +742,7 @@ async function App(root) {
   function startSessionPhrasesOnly() {
     const cat = state.settings.category;
     state.sessionPhrases = phraseData.phrases.filter((p) => p.category === cat)
-      .map((p) => ({ key: p.key, version: p.version, text: p.text, category: cat, unmatched: false }));
+      .map((p) => ({ key: p.key, version: p.version, text: p.text, category: cat, unmatched: false, translations: p.translations || {} }));
     // Re-surface any unmatched phrases already recorded so they show in the list.
     state.takes.filter((t) => t.meta.unmatched && t.meta.category === cat).forEach((t) => {
       if (!state.sessionPhrases.some((p) => p.unmatched && p.text === t.meta.phrase_text))
