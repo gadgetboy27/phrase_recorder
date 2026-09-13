@@ -92,7 +92,9 @@
       "version": 1,
       "category": "obstetric_emergency",
       "text": "Please stay as still as possible for me.",
-      "translations": {}
+      "translations": {
+        "mi": "E noho puku mai, koa."
+      }
     },
     {
       "key": "p004",
@@ -120,7 +122,9 @@
       "version": 1,
       "category": "obstetric_emergency",
       "text": "Try to breathe slowly and deeply.",
-      "translations": {}
+      "translations": {
+        "mi": "Whakamātauhia ki te whakahā āta ki te whakahā hōhonu hoki."
+      }
     },
     {
       "key": "p008",
