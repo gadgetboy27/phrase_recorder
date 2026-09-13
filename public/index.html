@@ -461,7 +461,7 @@ async function App(root) {
   // ---- Setup ---------------------------------------------------------------
   function renderSetup() {
     const s = state.settings || {
-      language: phraseData.languages[0].code, speakerId: "", speakerType: "native",
+      language: (phraseData.languages.find((l) => l.code === "en") || phraseData.languages[0]).code, speakerId: "", speakerType: "native",
       purpose: "asr_training", category: "obstetric_emergency", consent: false,
     };
     const locked = state.takes.length > 0;

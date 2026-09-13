@@ -28,26 +28,33 @@ volunteer's phone ──► batch.zip ──► Mac ─────────�
 | Piece | Path | What it does |
 |---|---|---|
 | Recorder | `public/index.html` | Static page on Cloudflare Pages. Volunteer picks language, speaker ID, consent; steps through a category's phrases; each accepted take is a 16-bit mono WAV at the device's native rate. Takes persist in IndexedDB. **Export batch** builds one zip (WAVs + `manifest.json`) and opens the share sheet (AirDrop on iPhone) or downloads it. |
-| Phrase list | `public/phrases.json` | Languages, categories, and phrases (`key` + `version`, language-neutral). The recorder fetches this; the Nano's `phrases` table is seeded with the same rows. |
+| Phrase list | `public/phrases.json` | Languages, categories, and phrases (`key` + `version`, language-neutral). The recorder fetches this. Generated from the Nano's tables by `tools/export_phrases.py` — never edit by hand. |
 | Ingest | `tools/ingest.py` | On the Mac. Verifies every WAV against the manifest (SHA-256, size, header, duration) and the phrase list, stages good batches under `~/phrase-recordings/staged/`, files failures under `rejected/` with a report. |
+| Phrase sync | `tools/export_phrases.py` | Regenerates `public/phrases.json` from the Nano's `phrases`, `phrase_categories`, and `languages` tables. `--check` reports whether the file is stale without writing. |
 | Push | `tools/push.py` | rsyncs a staged batch to the Nano and inserts `audio_samples` rows. Dedupes on SHA-256 so re-pushing is harmless. Unknown phrase keys are filed as unmatched and printed, never guessed. |
 | Schema | `nano/migrations/` + `nano/apply.sh` | Idempotent migrations on top of the brief's §16 schema. `001` adds the `phrases` table and the recording metadata columns. |
 
 ## Setup
 
-**Nano (once):** after the §16 setup, apply the migration:
+**Nano (once):** after the §16 setup, hand the tables to the app user (they
+are created as `postgres`) and make the recordings directory:
 
 ```bash
-PG_DSN="postgresql://interpreter_app:PASSWORD@localhost:5432/interpreter_data" nano/apply.sh
+sudo -u postgres psql -d interpreter_data -c 'ALTER TABLE languages OWNER TO interpreter_app; ALTER TABLE phrase_categories OWNER TO interpreter_app; ALTER TABLE golden_set OWNER TO interpreter_app; ALTER TABLE corrections OWNER TO interpreter_app; ALTER TABLE training_runs OWNER TO interpreter_app; ALTER TABLE dataset_snapshots OWNER TO interpreter_app; ALTER TABLE prompt_versions OWNER TO interpreter_app; ALTER TABLE audio_samples OWNER TO interpreter_app;'
 sudo mkdir -p /srv/phrase-recordings && sudo chown $USER /srv/phrase-recordings
 ```
+
+Migrations then run from the Mac as `interpreter_app`: `nano/apply.sh`
+(idempotent — rerun after pulling a new migration).
 
 **Mac (once):**
 
 ```bash
 brew install libpq && brew link --force libpq     # psql
-export NANO_DEST=nano@nano.local:/srv/phrase-recordings
-export PG_DSN="postgresql://interpreter_app:PASSWORD@nano.local:5432/interpreter_data"
+export NANO_DEST=gadgetboy@192.168.68.111:/srv/phrase-recordings
+export PG_DSN="postgresql://interpreter_app@192.168.68.111:5432/interpreter_data"
+# password goes in ~/.pgpass (chmod 600), never in the DSN or the repo:
+#   192.168.68.111:5432:interpreter_data:interpreter_app:PASSWORD
 ```
 
 ## Day-to-day
@@ -63,6 +70,10 @@ export PG_DSN="postgresql://interpreter_app:PASSWORD@nano.local:5432/interpreter
 
 `tools/push.py --all --dry-run` shows the rsync command and SQL without doing
 anything.
+
+**Adding phrases:** insert rows into `phrases` on the Nano (`phrase_key`,
+`version`, `category`, `canonical_text`), then `tools/export_phrases.py`,
+commit, push. The deployed recorder shows them on next load.
 
 ## Deploy
 
