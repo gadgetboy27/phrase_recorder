@@ -76,7 +76,7 @@ def mirror_recordings(dest):
                        capture_output=True, text=True)
     if p.returncode:
         raise RuntimeError(p.stderr.strip())
-    sent = [l for l in p.stdout.splitlines() if l.startswith("Number of regular files transferred")]
+    sent = [l for l in p.stdout.splitlines() if l.startswith(("Number of regular files transferred", "Number of files transferred"))]
     return out, sent[0].split(":")[1].strip() if sent else "?"
 
 
