@@ -66,6 +66,10 @@ export PG_DSN="postgresql://interpreter_app@192.168.68.111:5432/interpreter_data
 
 ## Day-to-day
 
+`tools/nano.sh` is the menu for all of this — it sets the env vars itself,
+shows whether the Nano is up, and offers status / start llama-server /
+ingest / push / bench / translations / backup / shutdown. Or step by step:
+
 1. Volunteer opens https://phrase-recorder.pages.dev on their phone, records,
    taps **Export batch**, AirDrops the zip to the Mac.
 2. `tools/ingest.py ~/Downloads` — validates everything in the folder. Listen
