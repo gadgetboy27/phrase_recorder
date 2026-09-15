@@ -36,6 +36,7 @@ volunteer's phone ──► batch.zip ──► Mac ─────────�
 | Review translations | `tools/translations.py` | `list` drafts, `play` a draft's recording on the Nano, `approve` / `reject`, or `set p003 mi "…"` to enter one directly. |
 | Bench | `tools/bench.py` | The bake-off number. For every approved translation: trims each linked recording to its speech (Silero VAD) and resamples to 16 kHz on the Nano — the original WAV is untouched — transcribes it with whisper-cli, asks the Nano's llama-server to translate the English, and scores both against the approved text (CER/WER, with and without macrons). Report under `~/phrase-recordings/bench/`; derived file + speech boundaries recorded on `audio_samples`. |
 | Nano worker | `nano/asr_worker.py` | The half of bench that runs on the Nano (copied over by `bench.py`). Uses `~/whisper.cpp` (CUDA build, `ggml-large-v3-turbo-q5_0.bin`, `ggml-silero-v6.2.0.bin`), sox, and the llama-server on `127.0.0.1:8080`. |
+| Backup | `tools/backup.py` | `pg_dump` of the Nano's database (the golden set) plus an rsync mirror of its recordings, into `~/phrase-recordings/backups/`. `--install` schedules it daily at 21:00 via launchd; skips quietly when the Nano is off. Last 30 dumps kept. |
 | Schema | `nano/migrations/` + `nano/apply.sh` | Idempotent migrations on top of the brief's §16 schema. `001` adds the `phrases` table and the recording metadata columns; `002` translations; `003` derived-audio columns. |
 
 ## Setup
@@ -76,6 +77,11 @@ export PG_DSN="postgresql://interpreter_app@192.168.68.111:5432/interpreter_data
 
 `tools/push.py --all --dry-run` shows the rsync command and SQL without doing
 anything.
+
+**Backups:** run nightly by launchd once `tools/backup.py --install` has been
+done on the Mac (it has). `tools/backup.py` runs one now; check
+`~/phrase-recordings/backups/backup.log`. Restore with
+`gunzip -c backups/db/<file>.sql.gz | psql interpreter_data`.
 
 **Scoring the models:** `tools/bench.py --lang mi` after any push or approval.
 Every recording is trimmed + resampled into `<batch>/derived/16k-trim/` on
