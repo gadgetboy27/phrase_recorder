@@ -62,7 +62,7 @@ menu() {
   3) ingest        validate zips/WAVs in ~/Downloads → staged/
   4) push          staged batches → Nano
   5) bench         score Whisper + Qwen against the golden set
-  6) translations  drafts awaiting review
+  6) translations  drafts awaiting review (Whisper drafts: tools/draft_transcripts.py --lang xx)
   7) backup        pg_dump + recordings mirror → Mac
   8) shutdown      (offers a backup first)
   q) quit

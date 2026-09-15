@@ -33,6 +33,7 @@ volunteer's phone ──► batch.zip ──► Mac ─────────�
 | Phrase sync | `tools/export_phrases.py` | Regenerates `public/phrases.json` from the Nano's `phrases`, `phrase_categories`, and `languages` tables. `--check` reports whether the file is stale without writing. |
 | Push | `tools/push.py` | rsyncs a staged batch to the Nano and inserts `audio_samples` rows. Dedupes on SHA-256 so re-pushing is harmless. Unknown phrase keys are filed as unmatched and printed, never guessed. Typed translations become draft `golden_set` rows linked to their recordings. |
 | Add phrases | `tools/add_phrase.py` | `--category intake "…"` adds the next key; `--revise p003 "…"` adds a new version. Refreshes `phrases.json` for you. |
+| Draft transcripts | `tools/draft_transcripts.py` | `--lang fa`: Whisper on the Nano transcribes every recording whose phrase has no approved text in that language and files the result as a `draft` golden_set row (`created_by whisper:<model>`) for a reader of the language to approve or reject. Never auto-approves. |
 | Review translations | `tools/translations.py` | `list` drafts, `play` a draft's recording on the Nano, `approve` / `reject`, or `set p003 mi "…"` to enter one directly. |
 | Bench | `tools/bench.py` | The bake-off number. For every approved translation: trims each linked recording to its speech (Silero VAD) and resamples to 16 kHz on the Nano — the original WAV is untouched — transcribes it with whisper-cli, asks the Nano's llama-server to translate the English, and scores both against the approved text (CER/WER, with and without macrons). Report under `~/phrase-recordings/bench/`; derived file + speech boundaries recorded on `audio_samples`. |
 | Nano worker | `nano/asr_worker.py` | The half of bench that runs on the Nano (copied over by `bench.py`). Uses `~/whisper.cpp` (CUDA build, `ggml-large-v3-turbo-q5_0.bin`, `ggml-silero-v6.2.0.bin`), sox, and the llama-server on `127.0.0.1:8080`. |
@@ -95,6 +96,12 @@ Whisper — and later fine-tuning — reads. `--model` swaps the Whisper model,
 
 **Adding phrases:** `tools/add_phrase.py --category intake "What is your
 date of birth?"` then commit and push `public/phrases.json`.
+
+**Recordings without text:** `tools/draft_transcripts.py --lang fa` lets
+Whisper propose the transcript; the drafts then go through the same
+review as typed ones. Persian/Arabic/Hindi/Mandarin/Vietnamese/Spanish are
+strong in Whisper so the drafts are close; Te Reo Māori is not — expect to
+correct those by hand.
 
 **Translations:** a non-English volunteer sees the approved translation to
 read if one exists; otherwise the English plus an optional box to type
