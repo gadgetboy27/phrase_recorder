@@ -36,6 +36,10 @@
     {
       "slug": "symptoms",
       "label": "Symptoms"
+    },
+    {
+      "slug": "welcome",
+      "label": "Welcome"
     }
   ],
   "languages": [
@@ -145,6 +149,13 @@
       "version": 1,
       "category": "obstetric_emergency",
       "text": "Is there anyone you would like us to call?",
+      "translations": {}
+    },
+    {
+      "key": "p011",
+      "version": 1,
+      "category": "welcome",
+      "text": "My name is …, what's your name?",
       "translations": {}
     }
   ]
