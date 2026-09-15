@@ -112,13 +112,18 @@ One per batch. A batch is one speaker, one language, one export.
       "duration_ms": 4120,
       "bytes": 395564,
       "sha256": "9f2c…",
-      "recorded_at": "2026-09-13T10:07:14.567Z"
+      "recorded_at": "2026-09-13T10:07:14.567Z",
+      "level": { "rms_dbfs": -22, "peak_dbfs": -6, "clipped": 0 }
     }
   ]
 }
 ```
 
 Rules:
+- `level` (optional, recorder ≥ 2.1) is what the on-screen meter saw:
+  mean RMS and peak of the take in dBFS, and how many 4096-sample buffers
+  peaked at or above −1 dBFS. The recorder shows amber below −32 dBFS RMS,
+  green to −12, red above; it warns the volunteer but never blocks a take.
 - `sha256` is over the full WAV file (header included). It is the
   dedupe key on the Nano (`audio_samples.sha256` is unique), so pushing
   the same batch twice is harmless.

@@ -77,6 +77,20 @@
   .btn-danger-link { background: none; color: #A63D40; padding: 6px 4px; min-height: 32px; font-size: 13px; text-decoration: underline; }
   .status { font-size: 13px; color: #6B6455; margin-top: 12px; min-height: 18px; }
   .status.live { color: #A63D40; font-weight: 700; }
+  /* Input level meter: amber too soft, green ideal, red too loud / clipping. */
+  .meter { display: none; margin-top: 10px; }
+  .meter.on { display: block; }
+  .meter-track { position: relative; height: 14px; border-radius: 7px; background: #E9E5DA; overflow: hidden; }
+  .meter-ideal { position: absolute; top: 0; bottom: 0; background: rgba(74,122,104,0.22); }
+  .meter-fill { position: absolute; top: 0; bottom: 0; left: 0; width: 0; border-radius: 7px; transition: width 60ms linear; }
+  .meter-peak { position: absolute; top: 0; bottom: 0; width: 2px; background: #1B2621; opacity: 0.6; }
+  .meter.soft .meter-fill { background: #C88A2E; }
+  .meter.good .meter-fill { background: #4A7A68; }
+  .meter.loud .meter-fill { background: #A63D40; }
+  .meter-label { display: flex; justify-content: space-between; font-size: 12px; margin-top: 4px; color: #6B6455; }
+  .meter.soft .meter-label b { color: #C88A2E; }
+  .meter.good .meter-label b { color: #4A7A68; }
+  .meter.loud .meter-label b { color: #A63D40; }
   audio { width: 100%; margin-top: 14px; }
   .confirm-box {
     font-size: 12px; color: #3D6656; background: #EEF3F0; border: 1px solid #4A7A68;
@@ -272,10 +286,36 @@ function buildWavBlob(samples, sampleRate) {
   return new Blob([view], { type: "audio/wav" });
 }
 
-const rec = { ctx: null, source: null, processor: null, stream: null, chunks: [], active: false, startedAt: 0 };
+const rec = { ctx: null, source: null, processor: null, stream: null, chunks: [], active: false, startedAt: 0, level: null };
+
+// Level zones in dBFS of the per-buffer RMS. Speech that sits in the green band
+// leaves headroom for peaks without being lost in the noise floor.
+const LEVEL = { floor: -60, soft: -32, loud: -12, clip: -1 };
+const dbfs = (x) => (x > 0 ? 20 * Math.log10(x) : LEVEL.floor);
+
+function trackLevel(samples) {
+  let sum = 0, peak = 0;
+  for (let i = 0; i < samples.length; i++) {
+    const v = samples[i], a = v < 0 ? -v : v;
+    sum += v * v;
+    if (a > peak) peak = a;
+  }
+  const L = rec.level;
+  L.rms = dbfs(Math.sqrt(sum / samples.length));
+  L.peak = dbfs(peak);
+  L.display = Math.max(L.rms, L.display - 2.5);          // fast attack, slow release
+  if (L.peak > L.takePeak) L.takePeak = L.peak;
+  if (L.peak >= LEVEL.clip) L.clipped++;
+  L.rmsSum += L.rms; L.n++;
+}
+
+function levelZone(db) {
+  return db < LEVEL.soft ? "soft" : db > LEVEL.loud ? "loud" : "good";
+}
 
 async function startCapture() {
   rec.chunks = [];
+  rec.level = { rms: LEVEL.floor, peak: LEVEL.floor, display: LEVEL.floor, takePeak: LEVEL.floor, clipped: 0, rmsSum: 0, n: 0 };
   // Raw audio for dataset collection — no browser-side processing where the platform honours it.
   rec.stream = await navigator.mediaDevices.getUserMedia({
     audio: { channelCount: 1, echoCancellation: false, noiseSuppression: false, autoGainControl: false },
@@ -286,7 +326,11 @@ async function startCapture() {
   // ScriptProcessorNode is deprecated but is the one path that works on every
   // phone browser we care about (incl. iOS Safari) without a separate worklet file.
   rec.processor = rec.ctx.createScriptProcessor(4096, 1, 1);
-  rec.processor.onaudioprocess = (e) => rec.chunks.push(new Float32Array(e.inputBuffer.getChannelData(0)));
+  rec.processor.onaudioprocess = (e) => {
+    const samples = new Float32Array(e.inputBuffer.getChannelData(0));
+    rec.chunks.push(samples);
+    trackLevel(samples);
+  };
   rec.source.connect(rec.processor);
   rec.processor.connect(rec.ctx.destination);
   rec.active = true;
@@ -305,11 +349,13 @@ function stopCapture() {
   const sampleRate = rec.ctx.sampleRate;
   rec.ctx.close();
   rec.chunks = [];
+  const L = rec.level;
   return {
     blob: buildWavBlob(merged, sampleRate),
     sampleRate,
     durationMs: Math.round((merged.length / sampleRate) * 1000),
     recordedAt: new Date(rec.startedAt),
+    level: { rms_dbfs: Math.round(L.n ? L.rmsSum / L.n : LEVEL.floor), peak_dbfs: Math.round(L.takePeak), clipped: L.clipped },
   };
 }
 
@@ -619,6 +665,28 @@ async function App(root) {
 
     const recordBtn = el("button", { class: "btn-record", disabled: !p });
     const status = el("div", { class: "status" });
+    const meterFill = el("div", { class: "meter-fill" });
+    const meterPeak = el("div", { class: "meter-peak", style: "left:0" });
+    const meterZone = el("b", { text: "" });
+    const pct = (db) => Math.max(0, Math.min(100, ((db - LEVEL.floor) / -LEVEL.floor) * 100));
+    const meter = el("div", { class: "meter" }, [
+      el("div", { class: "meter-track" }, [
+        el("div", { class: "meter-ideal", style: "left:" + pct(LEVEL.soft) + "%; width:" + (pct(LEVEL.loud) - pct(LEVEL.soft)) + "%" }),
+        meterFill, meterPeak,
+      ]),
+      el("div", { class: "meter-label" }, [el("span", { text: "Mic level — keep it in the green" }), meterZone]),
+    ]);
+    let meterRaf = 0;
+    function paintMeter() {
+      if (!rec.active) { meter.className = "meter"; return; }
+      const L = rec.level, zone = levelZone(L.display);
+      meterFill.style.width = pct(L.display) + "%";
+      meterPeak.style.left = pct(L.takePeak) + "%";
+      meter.className = "meter on " + zone;
+      meterZone.textContent = (zone === "soft" ? "Too soft — come closer" : zone === "loud" ? "Too loud — back off" : "Good")
+        + (L.clipped ? " · clipped, redo this take" : "");
+      meterRaf = requestAnimationFrame(paintMeter);
+    }
     const audioPreview = el("audio", { controls: true, style: "display:none" });
     const confirmBox = el("div", { class: "confirm-box", style: "display:none" });
     const filenameNote = el("div", { class: "filename" });
@@ -644,6 +712,7 @@ async function App(root) {
 
     card.appendChild(el("div", { class: "row" }, [recordBtn]));
     card.appendChild(status);
+    card.appendChild(meter);
     card.appendChild(audioPreview);
     card.appendChild(confirmBox);
     card.appendChild(filenameNote);
@@ -673,14 +742,16 @@ async function App(root) {
           audioPreview.style.display = "none"; confirmBox.style.display = "none"; acceptRow.style.display = "none"; filenameNote.textContent = "";
           await startCapture();
           paint();
+          paintMeter();
           state.timer = setInterval(paint, 200);
         } catch (err) {
           status.className = "status"; status.textContent = "Microphone access denied or unavailable.";
         }
       } else {
         clearInterval(state.timer);
+        cancelAnimationFrame(meterRaf);
         const result = stopCapture();
-        paint();
+        paint(); paintMeter();
         if (result.durationMs < 300) { status.textContent = "That was too short — try again."; return; }
         state.pending = result;
         state.pendingUrl = URL.createObjectURL(result.blob);
@@ -688,7 +759,10 @@ async function App(root) {
         status.textContent = "Listen back, then accept or redo.";
         confirmBox.style.display = "block";
         const said = mode.kind === "approved" ? mode.text : (mode.kind === "ask" && translationInput.value.trim()) || p.text;
-        confirmBox.textContent = "Check it matches: “" + said + "”  (" + fmtSecs(result.durationMs) + ", " + result.sampleRate + " Hz)";
+        const lv = result.level;
+        const levelNote = lv.clipped ? " — CLIPPED " + lv.clipped + " time(s), please redo further from the mic"
+          : lv.rms_dbfs < LEVEL.soft ? " — quiet take, consider redoing closer to the mic" : "";
+        confirmBox.textContent = "Check it matches: “" + said + "”  (" + fmtSecs(result.durationMs) + ", " + result.sampleRate + " Hz, peak " + lv.peak_dbfs + " dBFS" + levelNote + ")";
         acceptRow.style.display = "flex";
       }
     });
@@ -713,6 +787,7 @@ async function App(root) {
         read_text, translation_source,
         sample_rate: r.sampleRate, duration_ms: r.durationMs, bytes: r.blob.size,
         sha256: await sha256Hex(r.blob), recorded_at: r.recordedAt.toISOString(),
+        level: r.level,
       };
       const id = await dbAdd({ meta, blob: r.blob });
       state.takes.push({ id, meta, blob: r.blob });
