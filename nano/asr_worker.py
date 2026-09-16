@@ -33,6 +33,11 @@ from pathlib import Path
 WHISPER = Path.home() / "whisper.cpp"
 VAD_MODEL = WHISPER / "models" / "ggml-silero-v6.2.0.bin"
 LLAMA_URL = "http://127.0.0.1:8080/v1/chat/completions"
+# Whisper's language ids don't line up with ours everywhere: Dari is decoded as
+# Farsi; Tongan and Samoan aren't in Whisper at all (no drafts, no scores —
+# those need the fine-tuning route or a different ASR).
+WHISPER_LANG = {"prs": "fa"}
+WHISPER_UNSUPPORTED = {"to": "Tongan", "sm": "Samoan"}
 PAD_MS = 300            # keep room either side of the VAD boundaries so a soft first consonant survives
 DERIVED_SUBDIR = "derived/16k-trim"
 
@@ -117,6 +122,9 @@ def main():
         if not src.exists():
             rec["error"] = "missing on Nano"
             continue
+        if item["language"] in WHISPER_UNSUPPORTED:
+            rec["error"] = f"Whisper has no {WHISPER_UNSUPPORTED[item['language']]} model — no transcript"
+            continue
         batch, name = item["file_ref"].split("/", 1)
         dst = root / batch / DERIVED_SUBDIR / name
         rec["derived_ref"] = f"{batch}/{DERIVED_SUBDIR}/{name}"
@@ -138,7 +146,7 @@ def main():
     # 3: ASR, one whisper process per language
     t0 = time.time()
     for lang, items in by_lang.items():
-        texts = transcribe(job["whisper_model"], lang, [dst for _, dst in items])
+        texts = transcribe(job["whisper_model"], WHISPER_LANG.get(lang, lang), [dst for _, dst in items])
         for rec, dst in items:
             rec["asr_text"] = texts[str(dst)]
     t["asr_s"] = round(time.time() - t0, 2)

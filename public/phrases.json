@@ -48,6 +48,14 @@
       "label": "Arabic"
     },
     {
+      "code": "yue",
+      "label": "Cantonese"
+    },
+    {
+      "code": "prs",
+      "label": "Dari"
+    },
+    {
       "code": "en",
       "label": "English"
     },
@@ -60,16 +68,44 @@
       "label": "Hindi"
     },
     {
+      "code": "ja",
+      "label": "Japanese"
+    },
+    {
+      "code": "ko",
+      "label": "Korean"
+    },
+    {
+      "code": "lo",
+      "label": "Lao"
+    },
+    {
       "code": "zh",
       "label": "Mandarin"
+    },
+    {
+      "code": "pa",
+      "label": "Punjabi"
+    },
+    {
+      "code": "sm",
+      "label": "Samoan"
     },
     {
       "code": "es",
       "label": "Spanish"
     },
     {
+      "code": "tl",
+      "label": "Tagalog"
+    },
+    {
       "code": "mi",
       "label": "Te Reo Māori"
+    },
+    {
+      "code": "to",
+      "label": "Tongan"
     },
     {
       "code": "vi",
