@@ -30,6 +30,14 @@
       "label": "Obstetric Emergency"
     },
     {
+      "slug": "panel_ui",
+      "label": "Panel UI"
+    },
+    {
+      "slug": "patient_replies",
+      "label": "Patient replies"
+    },
+    {
       "slug": "surgeries",
       "label": "Surgeries"
     },
@@ -199,6 +207,62 @@
       "version": 1,
       "category": "welcome",
       "text": "What is your name?",
+      "translations": {}
+    },
+    {
+      "key": "p013",
+      "version": 1,
+      "category": "patient_replies",
+      "text": "Yes",
+      "translations": {}
+    },
+    {
+      "key": "p014",
+      "version": 1,
+      "category": "patient_replies",
+      "text": "No",
+      "translations": {}
+    },
+    {
+      "key": "p015",
+      "version": 1,
+      "category": "patient_replies",
+      "text": "I don't understand",
+      "translations": {}
+    },
+    {
+      "key": "p016",
+      "version": 1,
+      "category": "patient_replies",
+      "text": "Please say it again",
+      "translations": {}
+    },
+    {
+      "key": "p017",
+      "version": 1,
+      "category": "patient_replies",
+      "text": "I have pain",
+      "translations": {}
+    },
+    {
+      "key": "p018",
+      "version": 1,
+      "category": "patient_replies",
+      "text": "I need the toilet",
+      "translations": {}
+    },
+    {
+      "key": "p019",
+      "version": 1,
+      "category": "patient_replies",
+      "text": "Please call my family",
+      "translations": {}
+    },
+    {
+      "key": "p020",
+      "version": 1,
+      "category": "panel_ui",
+      "text": "Tap to reply",
       "translations": {}
     }
   ]

@@ -46,7 +46,7 @@ start() {
 panel() {
   need_up || return
   ssh "$NANO_SSH" 'mkdir -p ~/panel'
-  scp -q nano/panel_api.py nano/panel_takes.py nano/asr_worker.py tools/push.py public/phrases.json "$NANO_SSH:panel/"
+  scp -q nano/panel_api.py nano/panel_takes.py nano/panel_drafts.py nano/asr_worker.py tools/push.py public/phrases.json "$NANO_SSH:panel/"
   # The API files volunteer takes into Postgres itself, so the Nano needs the app password: reuse the
   # Mac's ~/.pgpass entry as a localhost line (mode 600). Skipped, with a warning, if the Mac has none.
   pw=$(awk -F: -v h="$HOST" '$1 == h && $3 == "interpreter_data" && $4 == "interpreter_app" {print $5; exit}' ~/.pgpass 2>/dev/null)
@@ -59,7 +59,7 @@ panel() {
     (crontab -l 2>/dev/null | grep -v -e panel_api.py -e llama-server
      echo "@reboot sleep 15 && python3 \$HOME/panel/panel_api.py >>\$HOME/panel/panel.log 2>&1"
      echo "@reboot sleep 20 && cd \$HOME/llama.cpp && ./build/bin/llama-server -m \$HOME/models/Qwen2.5-3B-Instruct-Q4_K_M.gguf -ngl 99 -c 2048 --port 8080 --host 127.0.0.1 >>\$HOME/llama-server.log 2>&1") | crontab -
-    pkill -f "^python3 panel_api.py"; sleep 1   # anchored so it cannot match this very shell
+    pkill -f "^python3 .*panel_api.py"; sleep 1   # anchored so it cannot match this very shell
     cd ~/panel && setsid -f python3 panel_api.py >>panel.log 2>&1 </dev/null
     for i in $(seq 1 10); do curl -s -m 1 localhost:8765/health && { echo; echo "panel api up (${i}s)"; exit 0; }; sleep 1; done
     echo "panel api did not come up — see ~/panel/panel.log on the Nano"; tail -5 ~/panel/panel.log

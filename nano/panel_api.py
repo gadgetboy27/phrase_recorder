@@ -16,6 +16,9 @@ Routes (JSON responses; the panel only reads the first ~60 chars of `say`):
                                native/fluent speaker → Piper on the approved translation → a learner's
                                recording → Piper in English. Returns at once; playback runs in the
                                background and a new tap cuts it off.
+  POST /panel/session?src=yy&dst=xx   start a session (turn log under ~/panel/sessions/)
+  POST /panel/reply/<key>?lang=xx&src=yy
+                               a preset patient reply: say phrase <key> in the clinician's language yy
   POST /panel/shutdown         power the Nano off (the panel's start screen has a hold-to-shut-down
                                button so a demo kit can be closed without a laptop)
   POST /panel/record?lang=xx   start recording the USB mic (a second tap restarts the take)
@@ -43,6 +46,7 @@ from urllib.parse import urlparse, parse_qs
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import asr_worker  # noqa: E402  (deployed alongside; whisper-cli + llama helpers)
 import panel_takes  # noqa: E402
+import panel_drafts  # noqa: E402
 
 HERE = Path(__file__).resolve().parent
 PHRASES = HERE / "phrases.json"
@@ -174,6 +178,32 @@ def to_language(text, language, target="English"):
         return json.load(r)["choices"][0]["message"]["content"].strip()
 
 
+def speak_phrase(p, lang, names):
+    """Say phrase p in lang: native/fluent recording → Piper on the approved text → learner recording →
+    English with a spoken warning. Returns the panel's reply dict."""
+    tr = p["text"] if lang == "en" else p["translations"].get(lang)
+    recs = recording_index().get((p["key"], lang), []) if lang != "en" else []
+    best = recs[0] if recs else None
+    lname = names.get(lang, lang)
+    if best and best[0] <= SPEAKER_RANK["fluent"]:
+        audio.play(best[2])
+        return {"say": tr or p["text"], "how": "recording", "lang": lang, "file": best[2].name, "note": None}
+    if tr and lang in VOICE:
+        audio.say(tr, lang)
+        return {"say": tr, "how": "piper", "lang": lang, "note": None}
+    if best:
+        audio.play(best[2])
+        return {"say": tr or p["text"], "how": "recording", "lang": lang, "file": best[2].name, "note": "learner recording"}
+    # English fallback — and say so, so nobody mistakes it for the translation
+    if tr:
+        warn, note = f"Sorry, I can't say that in {lname} yet.", f"No {lname} voice"
+    else:
+        warn, note = f"Sorry, I don't have that phrase in {lname} yet.", f"No {lname} version yet"
+    audio.say(warn, "en", then=(p["text"], "en"))
+    return {"say": tr or p["text"], "how": "piper", "lang": "en", "note": note, "warning": warn,
+            "offer_record": True, "draft": panel_drafts.get(p, lang)}
+
+
 def health():
     return {
         "audio": Path("/proc/asound/card0").exists(),
@@ -181,6 +211,7 @@ def health():
         "whisper": (asr_worker.WHISPER / "models" / WHISPER_MODEL).exists(),
         "llama": llama_up(),
         "db": panel_takes.db_ok(),
+        "drafts_pending": panel_drafts.pending(),
         "recording": audio.recording,
         "phrases": len(load_phrases()[0]),
     }
@@ -206,13 +237,20 @@ class Handler(BaseHTTPRequestHandler):
         if u.path == "/phrases":
             d = json.loads(PHRASES.read_text())
             lang, src = q.get("lang", "en"), q.get("src", "en")
+            names = {l["code"]: l["label"] for l in d["languages"]}
+            up = llama_up()
+            panel_drafts.request(d["phrases"], lang, names.get(lang, lang), up)     # unverified, for display only
+            panel_drafts.request(d["phrases"], src, names.get(src, src), up)
             recs = recording_index()
             return self.reply(200, {
                 "languages": d["languages"],
                 "categories": d["categories"],
+                "drafts_pending": panel_drafts.pending(),
                 "phrases": [{"key": p["key"], "category": p["category"], "text": p["text"],
                              "src_text": p["text"] if src == "en" else p["translations"].get(src),
+                             "src_draft": None if src == "en" or p["translations"].get(src) else panel_drafts.get(p, src),
                              "translation": p["translations"].get(lang),
+                             "draft": None if lang == "en" or p["translations"].get(lang) else panel_drafts.get(p, lang),
                              "recording": bool(recs.get((p["key"], lang)))} for p in d["phrases"]],
             })
         self.reply(404, {"error": "no such route"})
@@ -226,6 +264,21 @@ class Handler(BaseHTTPRequestHandler):
         action = u.path[len("/panel/"):]
         lang = q.get("lang", "en")
         try:
+            if action == "session":
+                sid = panel_drafts.start_session(q.get("src", "en"), q.get("dst", "?"))
+                return self.reply(200, {"say": "Session started", "session": sid})
+            if action.startswith("reply/"):                           # preset patient reply → clinician's language
+                phrases, names = load_phrases()
+                p = phrases.get(action[len("reply/"):])
+                if not p:
+                    return self.reply(404, {"say": "unknown reply"})
+                src = q.get("src", "en")
+                out = speak_phrase(p, src, names)
+                out["key"] = p["key"]
+                out["patient_text"] = p["translations"].get(lang) or p["text"]
+                panel_drafts.log_turn("patient", kind="preset", key=p["key"], sourceText=out["patient_text"],
+                                      translatedText=out["say"], how=out["how"])
+                return self.reply(200, out)
             if action == "shutdown":
                 log("shutdown requested by the panel")
                 self.reply(200, {"say": "Shutting down"})
@@ -281,45 +334,22 @@ class Handler(BaseHTTPRequestHandler):
                     out["say"] = f"{text} → {out['translated']}"
                     if q.get("speak") == "1" and src in VOICE:
                         audio.say(out["translated"], src)
+                    panel_drafts.log_turn("patient" if q.get("who") == "patient" else "clinician", kind="speech",
+                                          sourceText=text, translatedText=out.get("translated"))
                 elif text and lang != src:
                     out["say"] = f"{text}  (llama-server is off — no translation)"
                 return self.reply(200, out)
-            phrases, _ = load_phrases()
+            phrases, names = load_phrases()
             p = phrases.get(action)
             if not p:
                 return self.reply(404, {"say": f"unknown phrase {action}"})
-            tr = p["text"] if lang == "en" else p["translations"].get(lang)   # English is the source, not a translation
-            recs = recording_index().get((p["key"], lang), []) if lang != "en" else []
-            best = recs[0] if recs else None
-            if best and best[0] <= SPEAKER_RANK["fluent"]:            # a real speaker of the language
-                audio.play(best[2])
-                return self.reply(200, {"say": tr or p["text"], "how": "recording", "key": action, "lang": lang,
-                                        "file": best[2].name, "note": None})
-            if tr and lang in VOICE:                                  # synthesised in the language
-                audio.say(tr, lang)
-                return self.reply(200, {"say": tr, "how": "piper", "key": action, "lang": lang, "note": None})
-            if best:                                                  # only a learner's take, still the language
-                audio.play(best[2])
-                return self.reply(200, {"say": f"{tr or p['text']}  (learner recording)", "how": "recording",
-                                        "key": action, "lang": lang, "file": best[2].name, "note": "learner recording"})
-            # Fall back to English — and say so out loud first, so nobody mistakes it for the translation.
-            names = load_phrases()[1]
-            lname = names.get(lang, lang)
-            offer = lang != "en"
-            if tr:
-                warn, note = f"Sorry, I can't say that in {lname} yet.", f"No {lname} voice"
-                say = tr
-            elif lang == "en":
-                warn, note, offer, say = None, None, False, p["text"]
-            else:
-                warn, note = f"Sorry, I don't have that phrase in {lname} yet.", f"No {lname} version yet"
-                say = p["text"]
-            if warn:
-                audio.say(warn, "en", then=(p["text"], "en"))
-            else:
-                audio.say(p["text"], "en")
-            return self.reply(200, {"say": say, "how": "piper", "key": action, "lang": "en", "note": note,
-                                    "warning": warn, "offer_record": offer})
+            out = speak_phrase(p, lang, names)
+            out["key"] = p["key"]
+            src = q.get("src", "en")
+            out["src_text"] = p["text"] if src == "en" else (p["translations"].get(src) or p["text"])
+            panel_drafts.log_turn("clinician", kind="phrase", key=p["key"], sourceText=out["src_text"],
+                                  translatedText=out["say"], how=out["how"], note=out.get("note"))
+            return self.reply(200, out)
         except subprocess.CalledProcessError as e:
             log("subprocess failed:", e.cmd[0], (e.stderr or b"")[-300:])
             return self.reply(500, {"say": f"{e.cmd[0]} failed"})
