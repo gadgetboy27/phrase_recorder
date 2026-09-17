@@ -157,6 +157,11 @@ font:
     size: 18
     bpp: 4
     glyphs: *glyphs
+  - file: gfonts://Inter
+    id: ui_14
+    size: 14
+    bpp: 4
+    glyphs: *glyphs
 
 # Everything the screen shows comes from GET /phrases on the Nano (see nano/panel_api.py).
 globals:
@@ -269,17 +274,14 @@ lvgl:
             bg_opa: TRANSP
             border_width: 0
             pad_all: 0
-            layout: {type: grid, grid_columns: [FR(1), FR(1), FR(1)], grid_rows: [FR(1), FR(1), FR(1)], pad_column: 10, pad_row: 10}
+            layout: {type: grid, grid_columns: [FR(1), FR(1), FR(1)], grid_rows: [FR(1), FR(1)], pad_column: 10, pad_row: 10}
             widgets:
-              - button: {id: b1, grid_cell_column_pos: 0, grid_cell_row_pos: 0, grid_cell_x_align: STRETCH, grid_cell_y_align: STRETCH, pad_all: 6, widgets: [{label: {id: k1, align: TOP_LEFT, x: 2, y: -2, text_font: ui_18, text_color: "${c_muted}", text: ""}}, {label: {id: l1, align: CENTER, width: 96%, long_mode: WRAP, text_align: CENTER, text_font: ui_18, text: ""}}], on_click: {lambda: "id(tap).execute(0);"}}
-              - button: {id: b2, grid_cell_column_pos: 1, grid_cell_row_pos: 0, grid_cell_x_align: STRETCH, grid_cell_y_align: STRETCH, pad_all: 6, widgets: [{label: {id: k2, align: TOP_LEFT, x: 2, y: -2, text_font: ui_18, text_color: "${c_muted}", text: ""}}, {label: {id: l2, align: CENTER, width: 96%, long_mode: WRAP, text_align: CENTER, text_font: ui_18, text: ""}}], on_click: {lambda: "id(tap).execute(1);"}}
-              - button: {id: b3, grid_cell_column_pos: 2, grid_cell_row_pos: 0, grid_cell_x_align: STRETCH, grid_cell_y_align: STRETCH, pad_all: 6, widgets: [{label: {id: k3, align: TOP_LEFT, x: 2, y: -2, text_font: ui_18, text_color: "${c_muted}", text: ""}}, {label: {id: l3, align: CENTER, width: 96%, long_mode: WRAP, text_align: CENTER, text_font: ui_18, text: ""}}], on_click: {lambda: "id(tap).execute(2);"}}
-              - button: {id: b4, grid_cell_column_pos: 0, grid_cell_row_pos: 1, grid_cell_x_align: STRETCH, grid_cell_y_align: STRETCH, pad_all: 6, widgets: [{label: {id: k4, align: TOP_LEFT, x: 2, y: -2, text_font: ui_18, text_color: "${c_muted}", text: ""}}, {label: {id: l4, align: CENTER, width: 96%, long_mode: WRAP, text_align: CENTER, text_font: ui_18, text: ""}}], on_click: {lambda: "id(tap).execute(3);"}}
-              - button: {id: b5, grid_cell_column_pos: 1, grid_cell_row_pos: 1, grid_cell_x_align: STRETCH, grid_cell_y_align: STRETCH, pad_all: 6, widgets: [{label: {id: k5, align: TOP_LEFT, x: 2, y: -2, text_font: ui_18, text_color: "${c_muted}", text: ""}}, {label: {id: l5, align: CENTER, width: 96%, long_mode: WRAP, text_align: CENTER, text_font: ui_18, text: ""}}], on_click: {lambda: "id(tap).execute(4);"}}
-              - button: {id: b6, grid_cell_column_pos: 2, grid_cell_row_pos: 1, grid_cell_x_align: STRETCH, grid_cell_y_align: STRETCH, pad_all: 6, widgets: [{label: {id: k6, align: TOP_LEFT, x: 2, y: -2, text_font: ui_18, text_color: "${c_muted}", text: ""}}, {label: {id: l6, align: CENTER, width: 96%, long_mode: WRAP, text_align: CENTER, text_font: ui_18, text: ""}}], on_click: {lambda: "id(tap).execute(5);"}}
-              - button: {id: b7, grid_cell_column_pos: 0, grid_cell_row_pos: 2, grid_cell_x_align: STRETCH, grid_cell_y_align: STRETCH, pad_all: 6, widgets: [{label: {id: k7, align: TOP_LEFT, x: 2, y: -2, text_font: ui_18, text_color: "${c_muted}", text: ""}}, {label: {id: l7, align: CENTER, width: 96%, long_mode: WRAP, text_align: CENTER, text_font: ui_18, text: ""}}], on_click: {lambda: "id(tap).execute(6);"}}
-              - button: {id: b8, grid_cell_column_pos: 1, grid_cell_row_pos: 2, grid_cell_x_align: STRETCH, grid_cell_y_align: STRETCH, pad_all: 6, widgets: [{label: {id: k8, align: TOP_LEFT, x: 2, y: -2, text_font: ui_18, text_color: "${c_muted}", text: ""}}, {label: {id: l8, align: CENTER, width: 96%, long_mode: WRAP, text_align: CENTER, text_font: ui_18, text: ""}}], on_click: {lambda: "id(tap).execute(7);"}}
-              - button: {id: b9, grid_cell_column_pos: 2, grid_cell_row_pos: 2, grid_cell_x_align: STRETCH, grid_cell_y_align: STRETCH, pad_all: 6, widgets: [{label: {id: k9, align: TOP_LEFT, x: 2, y: -2, text_font: ui_18, text_color: "${c_muted}", text: ""}}, {label: {id: l9, align: CENTER, width: 96%, long_mode: WRAP, text_align: CENTER, text_font: ui_18, text: ""}}], on_click: {lambda: "id(tap).execute(8);"}}
+              - button: {id: b1, grid_cell_column_pos: 0, grid_cell_row_pos: 0, grid_cell_x_align: STRETCH, grid_cell_y_align: STRETCH, pad_all: 6, widgets: [{label: {id: k1, align: TOP_LEFT, x: 4, y: 0, text_font: ui_14, text_color: "${c_muted}", text: ""}}, {label: {id: l1, align: CENTER, y: 4, width: 94%, long_mode: WRAP, text_align: CENTER, text_font: ui_22, text: ""}}], on_click: {lambda: "id(tap).execute(0);"}}
+              - button: {id: b2, grid_cell_column_pos: 1, grid_cell_row_pos: 0, grid_cell_x_align: STRETCH, grid_cell_y_align: STRETCH, pad_all: 6, widgets: [{label: {id: k2, align: TOP_LEFT, x: 4, y: 0, text_font: ui_14, text_color: "${c_muted}", text: ""}}, {label: {id: l2, align: CENTER, y: 4, width: 94%, long_mode: WRAP, text_align: CENTER, text_font: ui_22, text: ""}}], on_click: {lambda: "id(tap).execute(1);"}}
+              - button: {id: b3, grid_cell_column_pos: 2, grid_cell_row_pos: 0, grid_cell_x_align: STRETCH, grid_cell_y_align: STRETCH, pad_all: 6, widgets: [{label: {id: k3, align: TOP_LEFT, x: 4, y: 0, text_font: ui_14, text_color: "${c_muted}", text: ""}}, {label: {id: l3, align: CENTER, y: 4, width: 94%, long_mode: WRAP, text_align: CENTER, text_font: ui_22, text: ""}}], on_click: {lambda: "id(tap).execute(2);"}}
+              - button: {id: b4, grid_cell_column_pos: 0, grid_cell_row_pos: 1, grid_cell_x_align: STRETCH, grid_cell_y_align: STRETCH, pad_all: 6, widgets: [{label: {id: k4, align: TOP_LEFT, x: 4, y: 0, text_font: ui_14, text_color: "${c_muted}", text: ""}}, {label: {id: l4, align: CENTER, y: 4, width: 94%, long_mode: WRAP, text_align: CENTER, text_font: ui_22, text: ""}}], on_click: {lambda: "id(tap).execute(3);"}}
+              - button: {id: b5, grid_cell_column_pos: 1, grid_cell_row_pos: 1, grid_cell_x_align: STRETCH, grid_cell_y_align: STRETCH, pad_all: 6, widgets: [{label: {id: k5, align: TOP_LEFT, x: 4, y: 0, text_font: ui_14, text_color: "${c_muted}", text: ""}}, {label: {id: l5, align: CENTER, y: 4, width: 94%, long_mode: WRAP, text_align: CENTER, text_font: ui_22, text: ""}}], on_click: {lambda: "id(tap).execute(4);"}}
+              - button: {id: b6, grid_cell_column_pos: 2, grid_cell_row_pos: 1, grid_cell_x_align: STRETCH, grid_cell_y_align: STRETCH, pad_all: 6, widgets: [{label: {id: k6, align: TOP_LEFT, x: 4, y: 0, text_font: ui_14, text_color: "${c_muted}", text: ""}}, {label: {id: l6, align: CENTER, y: 4, width: 94%, long_mode: WRAP, text_align: CENTER, text_font: ui_22, text: ""}}], on_click: {lambda: "id(tap).execute(5);"}}
         # ---- conversation row: clinician (sage, left) | heard (steel, right) | mic ----
         - obj:
             id: said_box
@@ -298,10 +300,10 @@ lvgl:
               - label: {id: said_lbl, align: BOTTOM_LEFT, width: 100%, long_mode: WRAP, text_font: ui_18, text_color: "${c_ink}", text: "Tap a phrase to say it."}
         - obj:
             id: heard_box
-            align: BOTTOM_MID
-            x: 40
+            align: BOTTOM_LEFT
+            x: 380
             y: -12
-            width: 300
+            width: 296
             height: 104
             bg_color: "${c_panel}"
             border_color: "${c_steel}"
@@ -468,18 +470,19 @@ script:
   - id: render
     then:
       - lambda: |-
-          lv_obj_t *btns[] = {id(b1), id(b2), id(b3), id(b4), id(b5), id(b6), id(b7), id(b8), id(b9)};
-          lv_obj_t *lbls[] = {id(l1), id(l2), id(l3), id(l4), id(l5), id(l6), id(l7), id(l8), id(l9)};
-          lv_obj_t *keys[] = {id(k1), id(k2), id(k3), id(k4), id(k5), id(k6), id(k7), id(k8), id(k9)};
+          lv_obj_t *btns[] = {id(b1), id(b2), id(b3), id(b4), id(b5), id(b6)};
+          lv_obj_t *lbls[] = {id(l1), id(l2), id(l3), id(l4), id(l5), id(l6)};
+          lv_obj_t *keys[] = {id(k1), id(k2), id(k3), id(k4), id(k5), id(k6)};
+          const int PER = 6;
           std::vector<int> match;
           for (size_t i = 0; i < id(ph_keys).size(); i++)
             if (id(cat_filter).empty() || id(ph_cats)[i] == id(cat_filter)) match.push_back(i);
-          int pages = std::max(1, ((int) match.size() + 8) / 9);
+          int pages = std::max(1, ((int) match.size() + PER - 1) / PER);
           if (id(page) >= pages) id(page) = pages - 1;
           if (id(page) < 0) id(page) = 0;
           id(shown).clear();
-          for (int n = 0; n < 9; n++) {
-            int m = id(page) * 9 + n;
+          for (int n = 0; n < PER; n++) {
+            int m = id(page) * PER + n;
             if (m < (int) match.size()) {
               int i = match[m];
               id(shown).push_back(i);
