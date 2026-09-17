@@ -2,7 +2,7 @@
 # Day-to-day menu for the Nano, from the Mac.
 #
 #   tools/nano.sh            # interactive menu
-#   tools/nano.sh status     # or any item by name: status start panel ingest push bench translations backup shutdown
+#   tools/nano.sh status     # or any item by name: status start panel hotspot ingest push bench translations backup shutdown
 #
 # Sets the env the other tools need (NANO_SSH, NANO_DEST, PG_DSN, libpq on PATH)
 # so nothing has to be exported by hand. Password for Postgres comes from ~/.pgpass.
@@ -56,12 +56,36 @@ panel() {
     echo "warning: no ~/.pgpass entry for $HOST/interpreter_data on the Mac — panel takes will not reach Postgres"
   fi
   ssh "$NANO_SSH" '
-    (crontab -l 2>/dev/null | grep -v panel_api.py; echo "@reboot sleep 15 && python3 \$HOME/panel/panel_api.py >>\$HOME/panel/panel.log 2>&1") | crontab -
+    (crontab -l 2>/dev/null | grep -v -e panel_api.py -e llama-server
+     echo "@reboot sleep 15 && python3 \$HOME/panel/panel_api.py >>\$HOME/panel/panel.log 2>&1"
+     echo "@reboot sleep 20 && cd \$HOME/llama.cpp && ./build/bin/llama-server -m \$HOME/models/Qwen2.5-3B-Instruct-Q4_K_M.gguf -ngl 99 -c 2048 --port 8080 --host 127.0.0.1 >>\$HOME/llama-server.log 2>&1") | crontab -
     pkill -f "^python3 panel_api.py"; sleep 1   # anchored so it cannot match this very shell
     cd ~/panel && setsid -f python3 panel_api.py >>panel.log 2>&1 </dev/null
     for i in $(seq 1 10); do curl -s -m 1 localhost:8765/health && { echo; echo "panel api up (${i}s)"; exit 0; }; sleep 1; done
     echo "panel api did not come up — see ~/panel/panel.log on the Nano"; tail -5 ~/panel/panel.log
   '
+}
+
+# Demo kit networking: the Nano's Wi-Fi as the "PhraseKit" hotspot (10.42.0.1) the panel joins.
+# Needs nmcli in /etc/sudoers.d/gadgetboy-power. With Ethernet plugged in the hotspot can stay on
+# for good (plan A); without it, `hotspot off` puts the Wi-Fi back on the home LAN (plan B).
+hotspot() {
+  need_up || return
+  case "${1:-status}" in
+    on)
+      ssh "$NANO_SSH" '
+        sudo -n nmcli -t -f NAME con show | grep -qx PhraseKit || {
+          sudo -n nmcli con add type wifi ifname wlP1p1s0 con-name PhraseKit autoconnect yes connection.autoconnect-priority 10 ssid PhraseKit &&
+          sudo -n nmcli con modify PhraseKit 802-11-wireless.mode ap 802-11-wireless.band bg ipv4.method shared ipv4.addresses 10.42.0.1/24 \
+            wifi-sec.key-mgmt wpa-psk wifi-sec.psk "kit-2026-phrase"; }
+        echo "switching Wi-Fi to the PhraseKit hotspot (this SSH session will drop if it came in over Wi-Fi)"
+        setsid -f sudo -n nmcli con up PhraseKit >/dev/null 2>&1 </dev/null' ;;
+    off)
+      ssh "$NANO_SSH" 'setsid -f sudo -n nmcli con up gadgetboy2 >/dev/null 2>&1 </dev/null; echo "Wi-Fi back on gadgetboy2 in a few seconds"' ;;
+    status)
+      ssh "$NANO_SSH" 'nmcli -t -f DEVICE,STATE,CONNECTION dev status | grep -E "^(wlP|enP)"; ip -4 -br addr | grep -E "wlP|enP"' ;;
+    *) echo "usage: tools/nano.sh hotspot [on|off|status]"; return 2 ;;
+  esac
 }
 
 ingest()       { tools/ingest.py --phrases public/phrases.json "${1:-$HOME/Downloads}"; }
@@ -83,6 +107,7 @@ menu() {
   1) status        health, services, golden-set count
   2) start         start llama-server (Qwen) if it isn't running
   p) panel         deploy/restart the touch-panel API (nano/panel_api.py)
+  h) hotspot       on|off|status — the Nano's PhraseKit Wi-Fi hotspot for demos
   3) ingest        validate zips/WAVs in ~/Downloads → staged/
   4) push          staged batches → Nano
   5) bench         score Whisper + Qwen against the golden set
@@ -93,7 +118,7 @@ menu() {
 EOF
     read -r -p "> " c
     case "$c" in
-      1|status) status ;; 2|start) start ;; p|panel) panel ;; 3|ingest) ingest ;; 4|push) push ;;
+      1|status) status ;; 2|start) start ;; p|panel) panel ;; h|hotspot) read -r -p "on/off/status? " m; hotspot "$m" ;; 3|ingest) ingest ;; 4|push) push ;;
       5|bench) bench ;; 6|translations) translations ;; 7|backup) backup ;;
       8|shutdown) shutdown_nano ;; q|quit|"") break ;;
       *) echo "?" ;;
@@ -103,7 +128,7 @@ EOF
 
 case "${1:-}" in
   "") menu ;;
-  status|start|panel|ingest|push|bench|translations|backup) f="$1"; shift; "$f" "$@" ;;
+  status|start|panel|hotspot|ingest|push|bench|translations|backup) f="$1"; shift; "$f" "$@" ;;
   shutdown) shutdown_nano ;;
-  *) echo "usage: tools/nano.sh [status|start|panel|ingest|push|bench|translations|backup|shutdown]"; exit 2 ;;
+  *) echo "usage: tools/nano.sh [status|start|panel|hotspot|ingest|push|bench|translations|backup|shutdown]"; exit 2 ;;
 esac

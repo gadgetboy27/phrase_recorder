@@ -16,6 +16,8 @@ Routes (JSON responses; the panel only reads the first ~60 chars of `say`):
                                native/fluent speaker → Piper on the approved translation → a learner's
                                recording → Piper in English. Returns at once; playback runs in the
                                background and a new tap cuts it off.
+  POST /panel/shutdown         power the Nano off (the panel's start screen has a hold-to-shut-down
+                               button so a demo kit can be closed without a laptop)
   POST /panel/record?lang=xx   start recording the USB mic (a second tap restarts the take)
   POST /panel/stop?lang=xx&src=yy&speak=1
                                stop, transcribe with whisper-cli in xx; when yy ≠ xx and llama-server
@@ -224,6 +226,11 @@ class Handler(BaseHTTPRequestHandler):
         action = u.path[len("/panel/"):]
         lang = q.get("lang", "en")
         try:
+            if action == "shutdown":
+                log("shutdown requested by the panel")
+                self.reply(200, {"say": "Shutting down"})
+                subprocess.Popen(["sudo", "-n", "shutdown", "-h", "+0"])       # passwordless via /etc/sudoers.d/gadgetboy-power
+                return
             if action == "record":
                 meta = None
                 if q.get("phrase"):                                   # a volunteer take of a phrase

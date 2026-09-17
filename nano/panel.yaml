@@ -2,7 +2,8 @@
 # Board/display block adapted from github.com/inytar/waveshare-esp32-s3-touch-lcd-7-esphome
 substitutions:
   name: phrase-panel
-  nano_url: "http://192.168.68.111:8765"   # nano/panel_api.py
+  nano_url: "http://192.168.68.111:8765"   # nano/panel_api.py when on the home LAN (on PhraseKit it is 10.42.0.1)
+  wifi_ssid_hint: "gadgetboy2"
   # Palette from docs/project-brief.md §10: clinician = sage, patient = steel blue, brick reserved.
   c_base: "0xF6F4EF"
   c_panel: "0xFFFFFF"
@@ -43,10 +44,17 @@ ota:
   - platform: esphome
 
 wifi:
-  ssid: !secret wifi_ssid
-  password: !secret wifi_password
+  networks:
+    - ssid: !secret kit_ssid          # the Nano's own hotspot (demo kit) — preferred
+      password: !secret kit_password
+      priority: 10
+    - ssid: !secret wifi_ssid         # home LAN
+      password: !secret wifi_password
   on_connect:
-    - script.execute: load_phrases
+    - lambda: |-
+        id(nano_base) = std::string([]{ std::array<char, wifi::SSID_BUFFER_SIZE> b; return std::string(wifi::global_wifi_component->wifi_ssid_to(b)); }()) == "PhraseKit" ? "http://10.42.0.1:8765" : "${nano_url}";
+        id(nano_ok) = false;
+        id(check_nano).execute();
   ap:
     ssid: "phrase-panel setup"
 captive_portal:
@@ -132,13 +140,6 @@ touchscreen:
     - lambda: ESP_LOGI("touch", "x=%d y=%d", touch.x, touch.y);
 
 
-text_sensor:
-  - platform: wifi_info
-    ip_address:
-      id: ip_addr
-      on_value:
-        - lambda: |-
-            static std::string s; s = x; lv_label_set_text(id(status_lbl), s.c_str());
 
 # Inter from Google Fonts: LVGL's built-in font has no macrons, and the Nano sends Te Reo text.
 font:
@@ -146,7 +147,7 @@ font:
     id: ui_28
     size: 28
     bpp: 4
-    glyphs: &glyphs " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~ĀāĒēĪīŌōŪū…→°●■↓‹›"
+    glyphs: &glyphs " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~ĀāĒēĪīŌōŪū…→°●■↓‹›✓✗·"
   - file: gfonts://Inter
     id: ui_22
     size: 22
@@ -171,6 +172,9 @@ globals:
   - {id: lang_code,  type: std::string, initial_value: '"en"'}             # = dst: what the Nano speaks / listens for
   - {id: lang_step,  type: int, initial_value: '0'}                         # wizard: 0 = choosing src, 1 = choosing dst
   - {id: turn,       type: int, initial_value: '0'}                         # 0 = clinician ("I speak") talking, 1 = patient
+  - {id: nano_base,  type: std::string, initial_value: '"${nano_url}"'}     # set from the SSID on connect
+  - {id: nano_ok,    type: bool, initial_value: 'false'}
+  - {id: polling,    type: bool, initial_value: 'false'}
   - {id: last_tap,   type: uint32_t, initial_value: '0'}
   - {id: cat_filter, type: std::string, initial_value: '""'}               # "" = all categories
   - {id: page,       type: int, initial_value: '0'}
@@ -221,7 +225,25 @@ lvgl:
       bg_color: "${c_base}"
       widgets:
         - label: {align: TOP_LEFT, x: 16, y: 14, text_font: ui_22, text_color: "${c_ink}", text: "Phrase Recorder"}
-        - label: {id: status_lbl, align: TOP_RIGHT, x: -16, y: 18, text_font: ui_18, text_color: "${c_muted}", text: "connecting…"}
+        - label: {id: status_lbl, align: TOP_RIGHT, x: -16, y: 18, text_font: ui_18, text_color: "${c_muted}", text: "Wi-Fi: connecting…"}
+        - button:
+            id: shutdown_btn
+            align: BOTTOM_RIGHT
+            x: -16
+            y: -12
+            width: 200
+            height: 44
+            pad_all: 0
+            border_color: "${c_line}"
+            widgets: [{label: {id: shutdown_lbl, align: CENTER, text_font: ui_14, text_color: "${c_muted}", text: "hold to shut down the Nano"}}]
+            on_long_press:
+              - lambda: 'lv_label_set_text(id(shutdown_lbl), "shutting down…");'
+              - http_request.post:
+                  url: !lambda return id(nano_base) + "/panel/shutdown";
+                  on_response:
+                    - lambda: 'lv_label_set_text(id(shutdown_lbl), "Nano is shutting down — unplug it in 20 s"); id(nano_ok) = false;'
+                  on_error:
+                    - lambda: 'lv_label_set_text(id(shutdown_lbl), "Nano not reachable");'
         - button:
             align: CENTER
             y: -40
@@ -554,6 +576,9 @@ lvgl:
                   mode: TEXT_LOWER
 
 interval:
+  - interval: 5s
+    then:
+      - script.execute: check_nano
   - interval: 600ms
     then:
       - lambda: |-
@@ -562,11 +587,50 @@ interval:
           lv_obj_set_style_outline_width(chip, on ? 4 : 0, LV_PART_MAIN);
 
 script:
+  - id: check_nano
+    then:
+      - lambda: |-
+          static std::string st;
+          if (!wifi::global_wifi_component->is_connected()) {
+            st = "Wi-Fi: looking for PhraseKit / " + std::string("${wifi_ssid_hint}") + "…";
+            lv_label_set_text(id(status_lbl), st.c_str());
+            id(nano_ok) = false;
+            return;
+          }
+          if (id(polling)) return;
+          id(polling) = true;
+      - http_request.get:
+          url: !lambda return id(nano_base) + "/health";
+          capture_response: true
+          max_response_buffer_size: 512
+          on_response:
+            - lambda: |-
+                id(polling) = false;
+                bool whisper = false, piper = false, llama = false, db = false;
+                json::parse_json(body, [&](JsonObject r) -> bool {
+                  whisper = r["whisper"] | false; piper = r["piper"] | false; llama = r["llama"] | false; db = r["db"] | false;
+                  return true;
+                });
+                static std::string st;
+                st = "Wi-Fi: " + std::string([]{ std::array<char, wifi::SSID_BUFFER_SIZE> b; return std::string(wifi::global_wifi_component->wifi_ssid_to(b)); }()) + " ✓  ·  Nano ✓  ·  speech " + (whisper && piper ? "✓" : "✗")
+                   + "  ·  translator " + (llama ? "✓" : "starting…") + "  ·  db " + (db ? "✓" : "✗");
+                lv_label_set_text(id(status_lbl), st.c_str());
+                bool first = !id(nano_ok);
+                id(nano_ok) = true;
+                if (first || id(ph_keys).empty()) id(load_phrases).execute();
+          on_error:
+            - lambda: |-
+                id(polling) = false;
+                id(nano_ok) = false;
+                static std::string st;
+                st = "Wi-Fi: " + std::string([]{ std::array<char, wifi::SSID_BUFFER_SIZE> b; return std::string(wifi::global_wifi_component->wifi_ssid_to(b)); }()) + " ✓  ·  Nano: not reachable yet…";
+                lv_label_set_text(id(status_lbl), st.c_str());
+
   # Fetch the phrase list for the current language and rebuild the dropdowns + grid.
   - id: load_phrases
     then:
       - http_request.get:
-          url: !lambda return std::string("${nano_url}/phrases?lang=") + id(lang_code) + "&src=" + id(src_code);
+          url: !lambda return std::string(id(nano_base) + "/phrases?lang=") + id(lang_code) + "&src=" + id(src_code);
           capture_response: true
           max_response_buffer_size: 32768
           on_response:
@@ -771,11 +835,11 @@ script:
           else { lv_label_set_text(id(said_lbl), "…"); }
       - http_request.post:
           url: !lambda |-
-            std::string u = std::string("${nano_url}/panel/") + pid + "?lang=" + id(lang_code) + "&src=" + id(src_code);
+            std::string u = std::string(id(nano_base) + "/panel/") + pid + "?lang=" + id(lang_code) + "&src=" + id(src_code);
             if ((pid == "record" || pid == "stop") && !id(rec_mode)) {   // free speech: whoever's turn it is
               std::string listen = id(turn) == 0 ? id(src_code) : id(lang_code);
               std::string to     = id(turn) == 0 ? id(lang_code) : id(src_code);
-              u = std::string("${nano_url}/panel/") + pid + "?lang=" + listen + "&src=" + to + "&speak=1";
+              u = std::string(id(nano_base) + "/panel/") + pid + "?lang=" + listen + "&src=" + to + "&speak=1";
             }
             if (pid == "record" && id(rec_mode) && id(rec_phrase) >= 0)
               u += "&phrase=" + id(ph_keys)[id(rec_phrase)] + "&speaker=" + id(spk_id) + "&type=" + id(spk_type) + "&consent=1";
