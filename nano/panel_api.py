@@ -9,15 +9,17 @@ survives a power cycle. Stdlib only — nothing to install on the Nano.
 
 Routes (JSON responses; the panel only reads the first ~60 chars of `say`):
   GET  /health                 what the panel depends on: audio card, piper, whisper, llama-server
-  GET  /phrases?lang=xx        {languages, categories, phrases:[{key, category, text, translation,
-                               recording}]} — everything the panel needs to build its own screen
+  GET  /phrases?lang=xx&src=yy {languages, categories, phrases:[{key, category, text, src_text,
+                               translation, recording}]} — everything the panel needs to build its
+                               screen. `lang` is the patient's language, `src` the clinician's.
   POST /panel/<key>?lang=xx    say phrase <key> in xx. Preference order: a pushed recording by a
                                native/fluent speaker → Piper on the approved translation → a learner's
                                recording → Piper in English. Returns at once; playback runs in the
                                background and a new tap cuts it off.
   POST /panel/record?lang=xx   start recording the USB mic (a second tap restarts the take)
-  POST /panel/stop             stop, transcribe with whisper-cli in xx; when xx ≠ en and
-                               llama-server is up, also translate the transcript to English.
+  POST /panel/stop?lang=xx&src=yy&speak=1
+                               stop, transcribe with whisper-cli in xx; when yy ≠ xx and llama-server
+                               is up, translate the transcript into yy and (speak=1) say it with Piper.
   POST /panel/record?lang=xx&phrase=p003&speaker=hp&type=native&consent=1
                                volunteer take of a phrase: on /panel/stop it is filed as a batch +
                                audio_samples row and whisper's text becomes a golden_set draft
@@ -155,9 +157,9 @@ def llama_up():
         return False
 
 
-def to_english(text, language):
+def to_language(text, language, target="English"):
     body = {"messages": [
-        {"role": "system", "content": f"Translate the patient's {language} sentence into plain English. "
+        {"role": "system", "content": f"Translate the patient's {language} sentence into plain {target}. "
                                       "Reply with the translation only."},
         {"role": "user", "content": text}], "temperature": 0, "max_tokens": 120}
     req = urllib.request.Request(asr_worker.LLAMA_URL, json.dumps(body).encode(), {"Content-Type": "application/json"})
@@ -178,7 +180,7 @@ def health():
 
 
 class Handler(BaseHTTPRequestHandler):
-    def log_message(self, fmt, *args):          # one line per request, our format
+    def log_message(self, fmt, *args):          # one line per request, our format (the pair is in the query)
         log(self.address_string(), fmt % args)
 
     def reply(self, code, obj):
@@ -196,12 +198,13 @@ class Handler(BaseHTTPRequestHandler):
             return self.reply(200, health())
         if u.path == "/phrases":
             d = json.loads(PHRASES.read_text())
-            lang = q.get("lang", "en")
+            lang, src = q.get("lang", "en"), q.get("src", "en")
             recs = recording_index()
             return self.reply(200, {
                 "languages": d["languages"],
                 "categories": d["categories"],
                 "phrases": [{"key": p["key"], "category": p["category"], "text": p["text"],
+                             "src_text": p["text"] if src == "en" else p["translations"].get(src),
                              "translation": p["translations"].get(lang),
                              "recording": bool(recs.get((p["key"], lang)))} for p in d["phrases"]],
             })
@@ -256,9 +259,15 @@ class Handler(BaseHTTPRequestHandler):
                 wl = asr_worker.WHISPER_LANG.get(lang, lang)
                 text = asr_worker.transcribe(WHISPER_MODEL, wl, [take])[str(take)]
                 out = {"say": text or "(nothing heard)", "text": text, "file": take.name}
-                if text and lang != "en" and llama_up():
-                    out["english"] = to_english(text, load_phrases()[1].get(lang, lang))
-                    out["say"] = f"{text} → {out['english']}"
+                src = q.get("src", "en")
+                if text and lang != src and llama_up():
+                    names = load_phrases()[1]
+                    out["translated"] = to_language(text, names.get(lang, lang), names.get(src, "English"))
+                    out["say"] = f"{text} → {out['translated']}"
+                    if q.get("speak") == "1" and src in VOICE:
+                        audio.say(out["translated"], src)
+                elif text and lang != src:
+                    out["say"] = f"{text}  (llama-server is off — no translation)"
                 return self.reply(200, out)
             phrases, _ = load_phrases()
             p = phrases.get(action)
