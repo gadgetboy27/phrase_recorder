@@ -46,7 +46,15 @@ start() {
 panel() {
   need_up || return
   ssh "$NANO_SSH" 'mkdir -p ~/panel'
-  scp -q nano/panel_api.py nano/asr_worker.py public/phrases.json "$NANO_SSH:panel/"
+  scp -q nano/panel_api.py nano/panel_takes.py nano/asr_worker.py tools/push.py public/phrases.json "$NANO_SSH:panel/"
+  # The API files volunteer takes into Postgres itself, so the Nano needs the app password: reuse the
+  # Mac's ~/.pgpass entry as a localhost line (mode 600). Skipped, with a warning, if the Mac has none.
+  pw=$(awk -F: -v h="$HOST" '$1 == h && $3 == "interpreter_data" && $4 == "interpreter_app" {print $5; exit}' ~/.pgpass 2>/dev/null)
+  if [ -n "$pw" ]; then
+    printf 'localhost:5432:interpreter_data:interpreter_app:%s\n' "$pw" | ssh "$NANO_SSH" 'umask 077; cat > ~/.pgpass'
+  else
+    echo "warning: no ~/.pgpass entry for $HOST/interpreter_data on the Mac — panel takes will not reach Postgres"
+  fi
   ssh "$NANO_SSH" '
     (crontab -l 2>/dev/null | grep -v panel_api.py; echo "@reboot sleep 15 && python3 \$HOME/panel/panel_api.py >>\$HOME/panel/panel.log 2>&1") | crontab -
     pkill -f "^python3 panel_api.py"; sleep 1   # anchored so it cannot match this very shell

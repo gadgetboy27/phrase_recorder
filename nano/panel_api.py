@@ -18,6 +18,10 @@ Routes (JSON responses; the panel only reads the first ~60 chars of `say`):
   POST /panel/record?lang=xx   start recording the USB mic (a second tap restarts the take)
   POST /panel/stop             stop, transcribe with whisper-cli in xx; when xx ≠ en and
                                llama-server is up, also translate the transcript to English.
+  POST /panel/record?lang=xx&phrase=p003&speaker=hp&type=native&consent=1
+                               volunteer take of a phrase: on /panel/stop it is filed as a batch +
+                               audio_samples row and whisper's text becomes a golden_set draft
+                               (panel_takes.py). Refused without consent=1 or a valid speaker id.
 """
 import hashlib
 import json
@@ -34,6 +38,7 @@ from urllib.parse import urlparse, parse_qs
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import asr_worker  # noqa: E402  (deployed alongside; whisper-cli + llama helpers)
+import panel_takes  # noqa: E402
 
 HERE = Path(__file__).resolve().parent
 PHRASES = HERE / "phrases.json"
@@ -91,6 +96,7 @@ class Audio:
         self.player = None
         self.recorder = None
         self.take = None
+        self.take_meta = None       # None for a free transcription, else the volunteer/phrase context
 
     def say(self, text, lang):
         voice = VOICE.get(lang, VOICE["en"])
@@ -108,10 +114,11 @@ class Audio:
                 self.player.wait()          # the card is only free once aplay has gone
             self.player = subprocess.Popen(["aplay", "-q", "-D", AUDIO_DEV, str(wav)])
 
-    def record(self):
+    def record(self, meta=None):
         with self.lock:
             self._stop_recorder()
             WORK.mkdir(parents=True, exist_ok=True)
+            self.take_meta = dict(meta or {}, started_at_ms=int(time.time() * 1000))
             self.take = WORK / time.strftime("%Y%m%dT%H%M%SZ_take.wav", time.gmtime())
             self.recorder = subprocess.Popen(
                 ["arecord", "-q", "-D", AUDIO_DEV, "-f", "S16_LE", "-r", "48000", "-c", "1", str(self.take)])
@@ -123,7 +130,8 @@ class Audio:
                 return None
             self._stop_recorder()
             take, self.take = self.take, None
-            return take
+            meta, self.take_meta = self.take_meta, None
+            return take, meta
 
     def _stop_recorder(self):
         if self.recorder and self.recorder.poll() is None:
@@ -163,6 +171,7 @@ def health():
         "piper": PIPER.exists(),
         "whisper": (asr_worker.WHISPER / "models" / WHISPER_MODEL).exists(),
         "llama": llama_up(),
+        "db": panel_takes.db_ok(),
         "recording": audio.recording,
         "phrases": len(load_phrases()[0]),
     }
@@ -208,12 +217,42 @@ class Handler(BaseHTTPRequestHandler):
         lang = q.get("lang", "en")
         try:
             if action == "record":
-                take = audio.record()
-                return self.reply(200, {"say": "Recording… tap Stop", "file": take.name})
+                meta = None
+                if q.get("phrase"):                                   # a volunteer take of a phrase
+                    phrases, _ = load_phrases()
+                    p = phrases.get(q["phrase"])
+                    sid = q.get("speaker", "").lower()
+                    if not p:
+                        return self.reply(404, {"say": f"unknown phrase {q['phrase']}"})
+                    if q.get("consent") != "1":
+                        return self.reply(409, {"say": "Consent not confirmed"})
+                    if not (2 <= len(sid) <= 12 and sid.isalnum()):
+                        return self.reply(409, {"say": "Speaker id: 2–12 letters/digits"})
+                    if q.get("type", "native") not in ("native", "fluent", "learner", "staff"):
+                        return self.reply(409, {"say": "Speaker type?"})
+                    tr = p["translations"].get(lang)
+                    meta = {"phrase": p, "lang": lang, "speaker": {"id": sid, "type": q.get("type", "native")},
+                            "read_text": p["text"] if lang == "en" else tr,
+                            "translation_source": "canonical" if lang == "en" else ("approved" if tr else None)}
+                take = audio.record(meta)
+                say = "Recording… tap Stop" if not meta else "Read it aloud, then tap Stop"
+                return self.reply(200, {"say": say, "file": take.name, "read_text": meta and meta["read_text"]})
             if action == "stop":
-                take = audio.stop()
+                take, meta = audio.stop()
                 if not take:
                     return self.reply(409, {"say": "Not recording"})
+                if meta and meta.get("phrase"):                       # file the take, then draft its text
+                    batch_id, rec = panel_takes.file_take(take, meta["started_at_ms"], meta["lang"], meta["speaker"],
+                                                          meta["phrase"], meta["read_text"], meta["translation_source"])
+                    wav = panel_takes.RECORDINGS / batch_id / rec["file"]
+                    wl = asr_worker.WHISPER_LANG.get(lang, lang)
+                    text = asr_worker.transcribe(WHISPER_MODEL, wl, [wav])[str(wav)]
+                    panel_takes.draft_transcript(batch_id, rec, lang, meta["phrase"], text, WHISPER_MODEL)
+                    say = f"Take {rec['take']} saved ({rec['duration_ms'] / 1000:.1f} s)"
+                    if text and lang != "en":
+                        say += f" — draft: {text}"
+                    log(f"take filed: {batch_id}/{rec['file']}")
+                    return self.reply(200, {"say": say, "text": text, "file": rec["file"], "batch": batch_id, "take": rec["take"]})
                 wl = asr_worker.WHISPER_LANG.get(lang, lang)
                 text = asr_worker.transcribe(WHISPER_MODEL, wl, [take])[str(take)]
                 out = {"say": text or "(nothing heard)", "text": text, "file": take.name}

@@ -189,9 +189,16 @@
     },
     {
       "key": "p011",
+      "version": 2,
+      "category": "welcome",
+      "text": "My name is",
+      "translations": {}
+    },
+    {
+      "key": "p012",
       "version": 1,
       "category": "welcome",
-      "text": "My name is …, what's your name?",
+      "text": "What is your name?",
       "translations": {}
     }
   ]
