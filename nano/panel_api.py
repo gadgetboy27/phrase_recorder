@@ -100,21 +100,26 @@ class Audio:
         self.take = None
         self.take_meta = None       # None for a free transcription, else the volunteer/phrase context
 
-    def say(self, text, lang):
+    def synth(self, text, lang):
         voice = VOICE.get(lang, VOICE["en"])
         wav = WORK / "tts" / f"{voice}_{hashlib.sha1(text.encode()).hexdigest()[:12]}.wav"
         if not wav.exists():
             wav.parent.mkdir(parents=True, exist_ok=True)
             subprocess.run([str(PIPER), "--model", str(VOICES / f"{voice}.onnx"), "--output_file", str(wav)],
                            input=text, text=True, check=True, capture_output=True)
-        self.play(wav)
+        return wav
 
-    def play(self, wav):
+    def say(self, text, lang, then=None):
+        """Speak text; `then` = (text, lang) to say straight after (e.g. a warning, then the phrase)."""
+        wavs = [self.synth(text, lang)] + ([self.synth(*then)] if then else [])
+        self.play(*wavs)
+
+    def play(self, *wavs):
         with self.lock:
             if self.player and self.player.poll() is None:
                 self.player.terminate()
                 self.player.wait()          # the card is only free once aplay has gone
-            self.player = subprocess.Popen(["aplay", "-q", "-D", AUDIO_DEV, str(wav)])
+            self.player = subprocess.Popen(["aplay", "-q", "-D", AUDIO_DEV, *map(str, wavs)])
 
     def record(self, meta=None):
         with self.lock:
@@ -290,15 +295,24 @@ class Handler(BaseHTTPRequestHandler):
                 audio.play(best[2])
                 return self.reply(200, {"say": f"{tr or p['text']}  (learner recording)", "how": "recording",
                                         "key": action, "lang": lang, "file": best[2].name, "note": "learner recording"})
-            audio.say(p["text"], "en")                                # fall back to English
-            offer = lang != "en"                                      # a volunteer recording would fix this
+            # Fall back to English — and say so out loud first, so nobody mistakes it for the translation.
+            names = load_phrases()[1]
+            lname = names.get(lang, lang)
+            offer = lang != "en"
             if tr:
-                say, note = f"{tr}\nSaid in English — no {lang} voice. Record it?", "no Piper voice for " + lang
+                warn, note = f"Sorry, I can't say that in {lname} yet.", f"No {lname} voice"
+                say = tr
             elif lang == "en":
-                say, note, offer = p["text"], None, False
+                warn, note, offer, say = None, None, False, p["text"]
             else:
-                say, note = f"{p['text']}\nNo {lang} version yet. Record it?", "no approved translation"
-            return self.reply(200, {"say": say, "how": "piper", "key": action, "lang": "en", "note": note, "offer_record": offer})
+                warn, note = f"Sorry, I don't have that phrase in {lname} yet.", f"No {lname} version yet"
+                say = p["text"]
+            if warn:
+                audio.say(warn, "en", then=(p["text"], "en"))
+            else:
+                audio.say(p["text"], "en")
+            return self.reply(200, {"say": say, "how": "piper", "key": action, "lang": "en", "note": note,
+                                    "warning": warn, "offer_record": offer})
         except subprocess.CalledProcessError as e:
             log("subprocess failed:", e.cmd[0], (e.stderr or b"")[-300:])
             return self.reply(500, {"say": f"{e.cmd[0]} failed"})
