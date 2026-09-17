@@ -179,7 +179,7 @@ font:
     id: ar_28
     size: 28
     bpp: 4
-    glyphs: &arabic "،؛؟ءآأؤإئابةتثجحخدذرزسشصضطظعغػؼؽؾؿـفقكلمنهوىي٠١٢٣٤٥٦٧٨٩پچژکگی۰۱۲۳۴۵۶۷۸۹ﭖﭗﭘﭙﭺﭻﭼﭽﮊﮋﮎﮏﮐﮑﮒﮓﮔﮕﯼﯽﯾﯿﹰﹱﹲﹳﹴﹶﹷﹸﹹﹺﹻﹼﹽﹾﹿﺀﺁﺂﺃﺄﺅﺆﺇﺈﺉﺊﺋﺌﺍﺎﺏﺐﺑﺒﺓﺔﺕﺖﺗﺘﺙﺚﺛﺜﺝﺞﺟﺠﺡﺢﺣﺤﺥﺦﺧﺨﺩﺪﺫﺬﺭﺮﺯﺰﺱﺲﺳﺴﺵﺶﺷﺸﺹﺺﺻﺼﺽﺾﺿﻀﻁﻂﻃﻄﻅﻆﻇﻈﻉﻊﻋﻌﻍﻎﻏﻐﻑﻒﻓﻔﻕﻖﻗﻘﻙﻚﻛﻜﻝﻞﻟﻠﻡﻢﻣﻤﻥﻦﻧﻨﻩﻪﻫﻬﻭﻮﻯﻰﻱﻲﻳﻴﻵﻶﻷﻸﻹﻺﻻﻼ .,?!0123456789"
+    glyphs: &arabic " !#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[]^_`abcdefghijklmnopqrstuvwxyz{|}~·ĀāĒēĪīŌōŪū،؛؟ءآأؤإئابةتثجحخدذرزسشصضطظعغػؼؽؾؿـفقكلمنهوىي٠١٢٣٤٥٦٧٨٩پچژکگی۰۱۲۳۴۵۶۷۸۹—…ﭖﭗﭘﭙﭺﭻﭼﭽﮊﮋﮎﮏﮐﮑﮒﮓﮔﮕﯼﯽﯾﯿﹰﹱﹲﹳﹴﹶﹷﹸﹹﹺﹻﹼﹽﹾﹿﺀﺁﺂﺃﺄﺅﺆﺇﺈﺉﺊﺋﺌﺍﺎﺏﺐﺑﺒﺓﺔﺕﺖﺗﺘﺙﺚﺛﺜﺝﺞﺟﺠﺡﺢﺣﺤﺥﺦﺧﺨﺩﺪﺫﺬﺭﺮﺯﺰﺱﺲﺳﺴﺵﺶﺷﺸﺹﺺﺻﺼﺽﺾﺿﻀﻁﻂﻃﻄﻅﻆﻇﻈﻉﻊﻋﻌﻍﻎﻏﻐﻑﻒﻓﻔﻕﻖﻗﻘﻙﻚﻛﻜﻝﻞﻟﻠﻡﻢﻣﻤﻥﻦﻧﻨﻩﻪﻫﻬﻭﻮﻯﻰﻱﻲﻳﻴﻵﻶﻷﻸﻹﻺﻻﻼ"
   - file: gfonts://Noto Sans Arabic
     id: ar_18
     size: 18
@@ -697,7 +697,7 @@ interval:
   - interval: 300ms                      # queued reloads run here, from a clean stack
     then:
       - lambda: |-
-          if (id(need_load) && !id(polling)) { id(need_load) = false; ESP_LOGI("diag", "timer → load_phrases (running=%d)", (int) id(load_phrases).is_running()); id(load_phrases).execute(); }
+          if (id(need_load) && !id(polling)) { id(need_load) = false; ESP_LOGD("diag", "timer → load_phrases (running=%d)", (int) id(load_phrases).is_running()); id(load_phrases).execute(); }
   - interval: 600ms
     then:
       - lambda: |-
@@ -748,14 +748,14 @@ script:
   # Fetch the phrase list for the current language and rebuild the dropdowns + grid.
   - id: load_phrases
     then:
-      - lambda: 'ESP_LOGI("diag", "load_phrases: GET %s/phrases?lang=%s&src=%s", id(nano_base).c_str(), id(lang_code).c_str(), id(src_code).c_str());'
+      - lambda: 'ESP_LOGD("diag", "load_phrases: GET %s/phrases?lang=%s&src=%s", id(nano_base).c_str(), id(lang_code).c_str(), id(src_code).c_str());'
       - http_request.get:
           url: !lambda return std::string(id(nano_base) + "/phrases?lang=") + id(lang_code) + "&src=" + id(src_code);
           capture_response: true
           max_response_buffer_size: 16384
           on_response:
             - lambda: |-
-                ESP_LOGI("diag", "phrases response: %d bytes, heap free %u / largest %u, psram free %u",
+                ESP_LOGD("diag", "phrases response: %d bytes, heap free %u / largest %u, psram free %u",
                          (int) body.size(), (unsigned) heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
                          (unsigned) heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL), (unsigned) heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
                 bool ok = json::parse_json(body, [](JsonObject root) -> bool {
@@ -789,7 +789,7 @@ script:
                   lv_dropdown_set_selected(id(cat_dd)->obj, ci);
                   return true;
                 });
-                ESP_LOGI("diag", "parsed ok=%d: %d phrases, %d langs, %d replies; rendering", (int) ok, (int) id(ph_keys).size(), (int) id(lang_codes).size(), (int) id(replies).size());
+                ESP_LOGD("diag", "parsed ok=%d: %d phrases, %d langs, %d replies; rendering", (int) ok, (int) id(ph_keys).size(), (int) id(lang_codes).size(), (int) id(replies).size());
                 // a remembered pair from last time → offer to resume
                 int n = id(lang_codes).size();
                 if (id(src_idx) >= 0 && id(src_idx) < n && id(dst_idx) >= 0 && id(dst_idx) < n) {
@@ -800,7 +800,7 @@ script:
                   lv_obj_add_flag(id(resume_btn), LV_OBJ_FLAG_HIDDEN);
                 }
                 id(render).execute();
-                ESP_LOGI("diag", "render done");
+                ESP_LOGD("diag", "render done");
           on_error:
             - lambda: 'ESP_LOGE("diag", "phrases request failed");'
             - lambda: 'set_text_any(id(said_lbl), id(said_lbl_ar), std::string("Nano not reachable — check it is on."));'

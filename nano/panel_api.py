@@ -265,16 +265,26 @@ class Handler(BaseHTTPRequestHandler):
             panel_drafts.request(d["phrases"], lang, names.get(lang, lang), up)     # unverified, for display only
             panel_drafts.request(d["phrases"], src, names.get(src, src), up)
             recs = recording_index()
+            def slim(p):
+                row = {"key": p["key"], "category": p["category"], "text": p["text"]}
+                if src != "en":
+                    if p["translations"].get(src):
+                        row["src_text"] = for_panel(p["translations"][src], src)
+                    elif panel_drafts.get(p, src):
+                        row["src_draft"] = for_panel(panel_drafts.get(p, src), src)
+                if lang != "en":
+                    if p["translations"].get(lang):
+                        row["translation"] = for_panel(p["translations"][lang], lang)
+                    elif panel_drafts.get(p, lang):
+                        row["draft"] = for_panel(panel_drafts.get(p, lang), lang)
+                if recs.get((p["key"], lang)):
+                    row["recording"] = True
+                return row
             return self.reply(200, {
                 "languages": d["languages"],
                 "categories": d["categories"],
                 "drafts_pending": panel_drafts.pending(),
-                "phrases": [{"key": p["key"], "category": p["category"], "text": p["text"],
-                             "src_text": p["text"] if src == "en" else for_panel(p["translations"].get(src), src),
-                             "src_draft": None if src == "en" or p["translations"].get(src) else for_panel(panel_drafts.get(p, src), src),
-                             "translation": for_panel(p["translations"].get(lang), lang),
-                             "draft": None if lang == "en" or p["translations"].get(lang) else for_panel(panel_drafts.get(p, lang), lang),
-                             "recording": bool(recs.get((p["key"], lang)))} for p in d["phrases"]],
+                "phrases": [slim(p) for p in d["phrases"]],
             })
         self.reply(404, {"error": "no such route"})
 
