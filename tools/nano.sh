@@ -2,7 +2,7 @@
 # Day-to-day menu for the Nano, from the Mac.
 #
 #   tools/nano.sh            # interactive menu
-#   tools/nano.sh status     # or any item by name: status start ingest push bench translations backup shutdown
+#   tools/nano.sh status     # or any item by name: status start panel ingest push bench translations backup shutdown
 #
 # Sets the env the other tools need (NANO_SSH, NANO_DEST, PG_DSN, libpq on PATH)
 # so nothing has to be exported by hand. Password for Postgres comes from ~/.pgpass.
@@ -26,6 +26,7 @@ status() {
     pg_isready -q -h localhost && echo "postgres: ok" || echo "postgres: DOWN"
     if pgrep -x llama-server >/dev/null; then echo "llm     : llama-server running ($(pgrep -a llama-server | grep -o "[^/]*\.gguf"))"; else echo "llm     : llama-server NOT running  → menu: start"; fi
     echo "asr     : whisper.cpp $(ls ~/whisper.cpp/models/ggml-large-v3-turbo-q5_0.bin >/dev/null 2>&1 && echo ready || echo "MODEL MISSING")"
+    echo "panel   : $(curl -s -m 2 localhost:8765/health || echo "api NOT running  → menu: panel")"
     echo "audio   : $(find ~/phrase-recordings -maxdepth 1 -mindepth 1 -type d -not -name "_*" -not -name ".*" | wc -l) batch dir(s)"
   '
   echo "golden  : $(psql "$PG_DSN" -At -c "select count(*)||' approved, '||count(*) filter (where status='draft')||' draft' from golden_set where status in ('approved','draft')" 2>/dev/null || echo "psql failed")"
@@ -38,6 +39,20 @@ start() {
     cd ~/llama.cpp && nohup ./build/bin/llama-server -m ~/models/Qwen2.5-3B-Instruct-Q4_K_M.gguf -ngl 99 -c 2048 --port 8080 --host 127.0.0.1 >~/llama-server.log 2>&1 &
     for i in $(seq 1 30); do curl -s localhost:8080/health | grep -q ok && { echo "llama-server up (${i}s)"; exit 0; }; sleep 1; done
     echo "llama-server did not come up — see ~/llama-server.log on the Nano"; tail -5 ~/llama-server.log
+  '
+}
+
+# Touch panel API (nano/panel_api.py): copy it + its helpers over, (re)start it, keep it across reboots.
+panel() {
+  need_up || return
+  ssh "$NANO_SSH" 'mkdir -p ~/panel'
+  scp -q nano/panel_api.py nano/asr_worker.py public/phrases.json "$NANO_SSH:panel/"
+  ssh "$NANO_SSH" '
+    (crontab -l 2>/dev/null | grep -v panel_api.py; echo "@reboot sleep 15 && python3 \$HOME/panel/panel_api.py >>\$HOME/panel/panel.log 2>&1") | crontab -
+    pkill -f "^python3 panel_api.py"; sleep 1   # anchored so it cannot match this very shell
+    cd ~/panel && setsid -f python3 panel_api.py >>panel.log 2>&1 </dev/null
+    for i in $(seq 1 10); do curl -s -m 1 localhost:8765/health && { echo; echo "panel api up (${i}s)"; exit 0; }; sleep 1; done
+    echo "panel api did not come up — see ~/panel/panel.log on the Nano"; tail -5 ~/panel/panel.log
   '
 }
 
@@ -59,6 +74,7 @@ menu() {
     cat <<'EOF'
   1) status        health, services, golden-set count
   2) start         start llama-server (Qwen) if it isn't running
+  p) panel         deploy/restart the touch-panel API (nano/panel_api.py)
   3) ingest        validate zips/WAVs in ~/Downloads → staged/
   4) push          staged batches → Nano
   5) bench         score Whisper + Qwen against the golden set
@@ -69,7 +85,7 @@ menu() {
 EOF
     read -r -p "> " c
     case "$c" in
-      1|status) status ;; 2|start) start ;; 3|ingest) ingest ;; 4|push) push ;;
+      1|status) status ;; 2|start) start ;; p|panel) panel ;; 3|ingest) ingest ;; 4|push) push ;;
       5|bench) bench ;; 6|translations) translations ;; 7|backup) backup ;;
       8|shutdown) shutdown_nano ;; q|quit|"") break ;;
       *) echo "?" ;;
@@ -79,7 +95,7 @@ EOF
 
 case "${1:-}" in
   "") menu ;;
-  status|start|ingest|push|bench|translations|backup) f="$1"; shift; "$f" "$@" ;;
+  status|start|panel|ingest|push|bench|translations|backup) f="$1"; shift; "$f" "$@" ;;
   shutdown) shutdown_nano ;;
-  *) echo "usage: tools/nano.sh [status|start|ingest|push|bench|translations|backup|shutdown]"; exit 2 ;;
+  *) echo "usage: tools/nano.sh [status|start|panel|ingest|push|bench|translations|backup|shutdown]"; exit 2 ;;
 esac

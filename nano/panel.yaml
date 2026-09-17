@@ -1,0 +1,426 @@
+# Waveshare ESP32-S3-Touch-LCD-7 (Rev 1.2, N16R8) — phrase_recorder touch panel
+# Board/display block adapted from github.com/inytar/waveshare-esp32-s3-touch-lcd-7-esphome
+substitutions:
+  name: phrase-panel
+  nano_url: "http://192.168.68.111:8765"   # nano/panel_api.py
+  # Palette from docs/project-brief.md §10: clinician = sage, patient = steel blue, brick reserved.
+  c_base: "0xF6F4EF"
+  c_panel: "0xFFFFFF"
+  c_ink: "0x1B2621"
+  c_sage: "0x4A7A68"
+  c_sage_soft: "0xE3EDE8"
+  c_steel: "0x6B7F9E"
+  c_steel_soft: "0xE6EAF1"
+  c_amber: "0xB8843C"
+  c_line: "0xDCD7C9"
+  c_muted: "0x8A8474"
+
+esphome:
+  name: ${name}
+  min_version: "2025.8.0"
+  platformio_options:
+    board_upload.maximum_ram_size: 524288
+
+esp32:
+  variant: esp32s3
+  flash_size: 16MB
+  cpu_frequency: 240MHz
+  framework:
+    type: esp-idf
+    advanced:
+      enable_idf_experimental_features: true
+
+psram:
+  mode: octal
+  speed: 80MHz
+
+logger:
+  level: INFO
+
+api:
+  reboot_timeout: 0s        # no Home Assistant; never reboot for lack of a client
+ota:
+  - platform: esphome
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  on_connect:
+    - script.execute: load_phrases
+  ap:
+    ssid: "phrase-panel setup"
+captive_portal:
+
+web_server:
+  port: 80
+
+json:
+
+http_request:
+  verify_ssl: false
+  timeout: 30s          # stop → Whisper can take a few seconds
+
+i2c:
+  sda: GPIO08
+  scl: GPIO09
+  scan: true
+  id: bus_a
+
+ch422g:
+  - id: ch422g_hub
+
+output:
+  - platform: gpio
+    id: lcdbacklight_output
+    pin:
+      ch422g: ch422g_hub
+      number: 2
+      mode:
+        output: true
+
+light:
+  - platform: binary
+    output: lcdbacklight_output
+    id: lcdbacklight
+    name: LCD Backlight
+    restore_mode: ALWAYS_ON
+
+display:
+  - platform: mipi_rgb
+    model: ESP32-S3-TOUCH-LCD-7-800X480
+    id: waveshare_display
+    update_interval: never
+    auto_clear_enabled: false
+    color_order: RGB
+    pclk_frequency: 16MHZ
+    dimensions:
+      width: 800
+      height: 480
+    de_pin:
+      number: 5
+    hsync_pin:
+      number: 46
+      ignore_strapping_warning: true
+    vsync_pin:
+      number: 3
+      ignore_strapping_warning: true
+    pclk_pin: 7
+    pclk_inverted: true
+    reset_pin:
+      ch422g: ch422g_hub
+      number: 3
+    hsync_back_porch: 8
+    hsync_front_porch: 8
+    hsync_pulse_width: 4
+    vsync_back_porch: 16
+    vsync_front_porch: 16
+    vsync_pulse_width: 4
+    data_pins:
+      red:   [1, 2, 42, 41, 40]
+      green: [39, 0, 45, 48, 47, 21]
+      blue:  [14, 38, 18, 17, 10]
+
+touchscreen:
+  platform: gt911
+  id: waveshare_touch
+  interrupt_pin: GPIO4
+  reset_pin:
+    ch422g: ch422g_hub
+    number: 1
+    mode: OUTPUT
+  on_touch:
+    - lambda: ESP_LOGI("touch", "x=%d y=%d", touch.x, touch.y);
+
+
+text_sensor:
+  - platform: wifi_info
+    ip_address:
+      id: ip_addr
+      on_value:
+        - lambda: |-
+            static std::string s; s = x; lv_label_set_text(id(status_lbl), s.c_str());
+
+# Inter from Google Fonts: LVGL's built-in font has no macrons, and the Nano sends Te Reo text.
+font:
+  - file: gfonts://Inter
+    id: ui_28
+    size: 28
+    bpp: 4
+    glyphs: &glyphs " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~ĀāĒēĪīŌōŪū…→°●■↓‹›"
+  - file: gfonts://Inter
+    id: ui_22
+    size: 22
+    bpp: 4
+    glyphs: *glyphs
+  - file: gfonts://Inter
+    id: ui_18
+    size: 18
+    bpp: 4
+    glyphs: *glyphs
+
+# Everything the screen shows comes from GET /phrases on the Nano (see nano/panel_api.py).
+globals:
+  - {id: lang_code,  type: std::string, initial_value: '"en"'}
+  - {id: cat_filter, type: std::string, initial_value: '""'}      # "" = all categories
+  - {id: page,       type: int, initial_value: '0'}
+  - {id: recording,  type: bool, initial_value: 'false'}
+  - {id: lang_codes, type: 'std::vector<std::string>'}
+  - {id: cat_slugs,  type: 'std::vector<std::string>'}
+  - {id: ph_keys,    type: 'std::vector<std::string>'}            # all phrases, in phrases.json order
+  - {id: ph_texts,   type: 'std::vector<std::string>'}
+  - {id: ph_cats,    type: 'std::vector<std::string>'}
+  - {id: ph_rec,     type: 'std::vector<bool>'}
+  - {id: shown,      type: 'std::vector<int>'}                    # indices of the phrases on the current page
+
+lvgl:
+  displays: [waveshare_display]
+  touchscreens: [waveshare_touch]
+  buffer_size: 25%
+  theme:
+    button:
+      radius: 14
+      bg_color: "${c_panel}"
+      border_color: "${c_sage}"
+      border_width: 2
+      text_color: "${c_ink}"
+      text_font: ui_22
+      shadow_width: 0
+      pressed:
+        bg_color: "${c_sage_soft}"
+    dropdown:
+      bg_color: "${c_panel}"
+      border_color: "${c_line}"
+      border_width: 1
+      radius: 10
+      text_color: "${c_ink}"
+      text_font: ui_18
+  pages:
+    - id: main_page
+      bg_color: "${c_base}"
+      pad_all: 0
+      widgets:
+        # ---- header ---------------------------------------------------------------
+        - label: {id: title_lbl, align: TOP_LEFT, x: 12, y: 14, text_font: ui_22, text_color: "${c_ink}", text: "Phrase Recorder"}
+        - label: {id: status_lbl, align: TOP_LEFT, x: 12, y: 40, text_font: ui_18, text_color: "${c_muted}", text: "connecting…"}
+        - dropdown:
+            id: cat_dd
+            align: TOP_RIGHT
+            x: -262
+            y: 10
+            width: 240
+            height: 44
+            symbol: "↓"
+            options: ["All categories"]
+            dropdown_list: {text_font: ui_18, bg_color: "${c_panel}", text_color: "${c_ink}", max_height: 380}
+            on_value:
+              - lambda: |-
+                  id(cat_filter) = x == 0 ? std::string("") : id(cat_slugs)[x - 1];
+                  id(page) = 0;
+                  id(render).execute();
+        - dropdown:
+            id: lang_dd
+            align: TOP_RIGHT
+            x: -12
+            y: 10
+            width: 240
+            height: 44
+            symbol: "↓"
+            options: ["English"]
+            dropdown_list: {text_font: ui_18, bg_color: "${c_panel}", text_color: "${c_ink}", max_height: 380}
+            on_value:
+              - lambda: |-
+                  if (x < (int) id(lang_codes).size()) id(lang_code) = id(lang_codes)[x];
+                  id(page) = 0;
+                  id(load_phrases).execute();
+        # ---- phrase grid: 3 x 3 per page, arrows either side ---------------------------
+        - button: {id: prev_btn, align: LEFT_MID, x: 8, y: -40, width: 36, height: 120, border_width: 0, bg_color: "${c_base}", pad_all: 0, hidden: true,
+                   widgets: [{label: {align: CENTER, text: "‹", text_font: ui_28, text_color: "${c_muted}"}}],
+                   on_click: {lambda: "id(page)--; id(render).execute();"}}
+        - button: {id: next_btn, align: RIGHT_MID, x: -8, y: -40, width: 36, height: 120, border_width: 0, bg_color: "${c_base}", pad_all: 0, hidden: true,
+                   widgets: [{label: {align: CENTER, text: "›", text_font: ui_28, text_color: "${c_muted}"}}],
+                   on_click: {lambda: "id(page)++; id(render).execute();"}}
+        - obj:
+            id: grid
+            align: TOP_MID
+            y: 64
+            width: 700
+            height: 280
+            bg_opa: TRANSP
+            border_width: 0
+            pad_all: 0
+            layout: {type: grid, grid_columns: [FR(1), FR(1), FR(1)], grid_rows: [FR(1), FR(1), FR(1)], pad_column: 10, pad_row: 10}
+            widgets:
+              - button: {id: b1, grid_cell_column_pos: 0, grid_cell_row_pos: 0, grid_cell_x_align: STRETCH, grid_cell_y_align: STRETCH, pad_all: 6, widgets: [{label: {id: l1, align: CENTER, width: 96%, long_mode: WRAP, text_align: CENTER, text_font: ui_18, text: ""}}], on_click: {lambda: "id(tap).execute(0);"}}
+              - button: {id: b2, grid_cell_column_pos: 1, grid_cell_row_pos: 0, grid_cell_x_align: STRETCH, grid_cell_y_align: STRETCH, pad_all: 6, widgets: [{label: {id: l2, align: CENTER, width: 96%, long_mode: WRAP, text_align: CENTER, text_font: ui_18, text: ""}}], on_click: {lambda: "id(tap).execute(1);"}}
+              - button: {id: b3, grid_cell_column_pos: 2, grid_cell_row_pos: 0, grid_cell_x_align: STRETCH, grid_cell_y_align: STRETCH, pad_all: 6, widgets: [{label: {id: l3, align: CENTER, width: 96%, long_mode: WRAP, text_align: CENTER, text_font: ui_18, text: ""}}], on_click: {lambda: "id(tap).execute(2);"}}
+              - button: {id: b4, grid_cell_column_pos: 0, grid_cell_row_pos: 1, grid_cell_x_align: STRETCH, grid_cell_y_align: STRETCH, pad_all: 6, widgets: [{label: {id: l4, align: CENTER, width: 96%, long_mode: WRAP, text_align: CENTER, text_font: ui_18, text: ""}}], on_click: {lambda: "id(tap).execute(3);"}}
+              - button: {id: b5, grid_cell_column_pos: 1, grid_cell_row_pos: 1, grid_cell_x_align: STRETCH, grid_cell_y_align: STRETCH, pad_all: 6, widgets: [{label: {id: l5, align: CENTER, width: 96%, long_mode: WRAP, text_align: CENTER, text_font: ui_18, text: ""}}], on_click: {lambda: "id(tap).execute(4);"}}
+              - button: {id: b6, grid_cell_column_pos: 2, grid_cell_row_pos: 1, grid_cell_x_align: STRETCH, grid_cell_y_align: STRETCH, pad_all: 6, widgets: [{label: {id: l6, align: CENTER, width: 96%, long_mode: WRAP, text_align: CENTER, text_font: ui_18, text: ""}}], on_click: {lambda: "id(tap).execute(5);"}}
+              - button: {id: b7, grid_cell_column_pos: 0, grid_cell_row_pos: 2, grid_cell_x_align: STRETCH, grid_cell_y_align: STRETCH, pad_all: 6, widgets: [{label: {id: l7, align: CENTER, width: 96%, long_mode: WRAP, text_align: CENTER, text_font: ui_18, text: ""}}], on_click: {lambda: "id(tap).execute(6);"}}
+              - button: {id: b8, grid_cell_column_pos: 1, grid_cell_row_pos: 2, grid_cell_x_align: STRETCH, grid_cell_y_align: STRETCH, pad_all: 6, widgets: [{label: {id: l8, align: CENTER, width: 96%, long_mode: WRAP, text_align: CENTER, text_font: ui_18, text: ""}}], on_click: {lambda: "id(tap).execute(7);"}}
+              - button: {id: b9, grid_cell_column_pos: 2, grid_cell_row_pos: 2, grid_cell_x_align: STRETCH, grid_cell_y_align: STRETCH, pad_all: 6, widgets: [{label: {id: l9, align: CENTER, width: 96%, long_mode: WRAP, text_align: CENTER, text_font: ui_18, text: ""}}], on_click: {lambda: "id(tap).execute(8);"}}
+        # ---- conversation row: clinician (sage, left) | heard (steel, right) | mic ----
+        - obj:
+            id: said_box
+            align: BOTTOM_LEFT
+            x: 12
+            y: -12
+            width: 356
+            height: 104
+            bg_color: "${c_panel}"
+            border_color: "${c_sage}"
+            border_width: 2
+            radius: 12
+            pad_all: 8
+            widgets:
+              - label: {align: TOP_LEFT, text: "Clinician", text_font: ui_18, text_color: "${c_sage}"}
+              - label: {id: said_lbl, align: BOTTOM_LEFT, width: 100%, long_mode: WRAP, text_font: ui_18, text_color: "${c_ink}", text: "Tap a phrase to say it."}
+        - obj:
+            id: heard_box
+            align: BOTTOM_MID
+            x: 40
+            y: -12
+            width: 300
+            height: 104
+            bg_color: "${c_panel}"
+            border_color: "${c_steel}"
+            border_width: 2
+            radius: 12
+            pad_all: 8
+            widgets:
+              - label: {align: TOP_RIGHT, text: "Heard", text_font: ui_18, text_color: "${c_steel}"}
+              - label: {id: heard_lbl, align: BOTTOM_LEFT, width: 100%, long_mode: WRAP, text_font: ui_18, text_color: "${c_ink}", text: "—"}
+        - button:
+            id: mic_btn
+            align: BOTTOM_RIGHT
+            x: -12
+            y: -12
+            width: 96
+            height: 104
+            bg_color: "${c_steel}"
+            border_width: 0
+            widgets:
+              - label: {id: mic_lbl, align: CENTER, text_align: CENTER, text_font: ui_18, text_color: "${c_panel}", text: "●\nRecord"}
+            on_click:
+              - lambda: |-
+                  id(send_phrase).execute(id(recording) ? "stop" : "record");
+
+script:
+  # Fetch the phrase list for the current language and rebuild the dropdowns + grid.
+  - id: load_phrases
+    then:
+      - http_request.get:
+          url: !lambda return std::string("${nano_url}/phrases?lang=") + id(lang_code);
+          capture_response: true
+          max_response_buffer_size: 32768
+          on_response:
+            - lambda: |-
+                json::parse_json(body, [](JsonObject root) -> bool {
+                  std::string lopts, copts = "All categories";
+                  id(lang_codes).clear();
+                  for (JsonObject l : root["languages"].as<JsonArray>()) {
+                    id(lang_codes).push_back(l["code"].as<std::string>());
+                    if (!lopts.empty()) lopts += "\n";
+                    lopts += l["label"].as<std::string>();
+                  }
+                  id(cat_slugs).clear();
+                  for (JsonObject c : root["categories"].as<JsonArray>()) {
+                    id(cat_slugs).push_back(c["slug"].as<std::string>());
+                    copts += "\n"; copts += c["label"].as<std::string>();
+                  }
+                  id(ph_keys).clear(); id(ph_texts).clear(); id(ph_cats).clear(); id(ph_rec).clear();
+                  for (JsonObject p : root["phrases"].as<JsonArray>()) {
+                    id(ph_keys).push_back(p["key"].as<std::string>());
+                    id(ph_texts).push_back(p["text"].as<std::string>());
+                    id(ph_cats).push_back(p["category"].as<std::string>());
+                    id(ph_rec).push_back(p["recording"].as<bool>());
+                  }
+                  // keep the selections; only the option lists are rebuilt
+                  int li = lv_dropdown_get_selected(id(lang_dd)->obj), ci = lv_dropdown_get_selected(id(cat_dd)->obj);
+                  lv_dropdown_set_options(id(lang_dd)->obj, lopts.c_str());
+                  lv_dropdown_set_options(id(cat_dd)->obj, copts.c_str());
+                  lv_dropdown_set_selected(id(lang_dd)->obj, li);
+                  lv_dropdown_set_selected(id(cat_dd)->obj, ci);
+                  return true;
+                });
+                id(render).execute();
+          on_error:
+            - lambda: 'lv_label_set_text(id(said_lbl), "Nano not reachable — check it is on.");'
+
+  # Lay the current page of the (filtered) phrase list onto the nine buttons.
+  - id: render
+    then:
+      - lambda: |-
+          lv_obj_t *btns[] = {id(b1), id(b2), id(b3), id(b4), id(b5), id(b6), id(b7), id(b8), id(b9)};
+          lv_obj_t *lbls[] = {id(l1), id(l2), id(l3), id(l4), id(l5), id(l6), id(l7), id(l8), id(l9)};
+          std::vector<int> match;
+          for (size_t i = 0; i < id(ph_keys).size(); i++)
+            if (id(cat_filter).empty() || id(ph_cats)[i] == id(cat_filter)) match.push_back(i);
+          int pages = std::max(1, ((int) match.size() + 8) / 9);
+          if (id(page) >= pages) id(page) = pages - 1;
+          if (id(page) < 0) id(page) = 0;
+          id(shown).clear();
+          for (int n = 0; n < 9; n++) {
+            int m = id(page) * 9 + n;
+            if (m < (int) match.size()) {
+              int i = match[m];
+              id(shown).push_back(i);
+              std::string t = id(ph_texts)[i];
+              if (t.size() > 64) t = t.substr(0, 63) + "…";
+              if (id(ph_rec)[i]) t += "  ●";                 // a native recording exists in this language
+              lv_label_set_text(lbls[n], t.c_str());
+              lv_obj_clear_flag(btns[n], LV_OBJ_FLAG_HIDDEN);
+            } else {
+              lv_obj_add_flag(btns[n], LV_OBJ_FLAG_HIDDEN);
+            }
+          }
+          if (id(page) > 0) lv_obj_clear_flag(id(prev_btn), LV_OBJ_FLAG_HIDDEN); else lv_obj_add_flag(id(prev_btn), LV_OBJ_FLAG_HIDDEN);
+          if (id(page) < pages - 1) lv_obj_clear_flag(id(next_btn), LV_OBJ_FLAG_HIDDEN); else lv_obj_add_flag(id(next_btn), LV_OBJ_FLAG_HIDDEN);
+
+  - id: tap
+    parameters:
+      n: int
+    then:
+      - lambda: |-
+          if (n < (int) id(shown).size()) id(send_phrase).execute(id(ph_keys)[id(shown)[n]]);
+
+  # POST /panel/<pid>?lang=xx and route the Nano's reply to the right bubble.
+  - id: send_phrase
+    parameters:
+      pid: string
+    then:
+      - lambda: |-
+          if (pid == "record") { lv_label_set_text(id(heard_lbl), "Listening…"); }
+          else if (pid == "stop") { lv_label_set_text(id(heard_lbl), "Transcribing…"); }
+          else { lv_label_set_text(id(said_lbl), "…"); }
+      - http_request.post:
+          url: !lambda return std::string("${nano_url}/panel/") + pid + "?lang=" + id(lang_code);
+          capture_response: true
+          max_response_buffer_size: 1024
+          on_response:
+            - lambda: |-
+                std::string say = body.substr(0, 200);
+                json::parse_json(body, [&](JsonObject root) -> bool {
+                  if (root["say"].is<const char *>()) say = root["say"].as<std::string>();
+                  return true;
+                });
+                if (pid == "record") {
+                  id(recording) = true;
+                  lv_label_set_text(id(mic_lbl), "■\nStop");
+                  lv_obj_set_style_bg_color(id(mic_btn), lv_color_hex(${c_amber}), LV_PART_MAIN);
+                } else if (pid == "stop") {
+                  id(recording) = false;
+                  lv_label_set_text(id(mic_lbl), "●\nRecord");
+                  lv_obj_set_style_bg_color(id(mic_btn), lv_color_hex(${c_steel}), LV_PART_MAIN);
+                  lv_label_set_text(id(heard_lbl), say.c_str());
+                } else {
+                  lv_label_set_text(id(said_lbl), say.c_str());
+                }
+          on_error:
+            - lambda: |-
+                lv_label_set_text(pid == "stop" || pid == "record" ? id(heard_lbl) : id(said_lbl), "Nano not reachable");
+
+button:
+  - platform: restart
+    name: reboot
+    id: reboot_btn

@@ -18,3 +18,7 @@ build/
 # Python
 __pycache__/
 *.pyc
+
+# ESPHome (touch panel firmware)
+nano/secrets.yaml
+nano/.esphome/
