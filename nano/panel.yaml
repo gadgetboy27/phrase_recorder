@@ -190,6 +190,8 @@ globals:
   - {id: spk_type,   type: std::string, initial_value: '"native"'}
   - {id: consented,  type: bool, initial_value: 'false'}
   - {id: rec_phrase, type: int, initial_value: '-1'}               # phrase index being recorded, or -1
+  - {id: want_rec,   type: int, initial_value: '-1'}               # phrase queued by "Record it" until Record mode is on
+  - {id: last_phrase, type: int, initial_value: '-1'}              # phrase index of the last tap (for the offer)
 
 lvgl:
   displays: [waveshare_display]
@@ -410,6 +412,22 @@ lvgl:
             pad_all: 8
             widgets:
               - label: {id: said_who, align: TOP_LEFT, text: "Clinician", text_font: ui_18, text_color: "${c_sage}"}
+              - button:
+                  id: offer_btn
+                  align: TOP_RIGHT
+                  width: 110
+                  height: 36
+                  pad_all: 0
+                  hidden: true
+                  bg_color: "${c_amber}"
+                  border_width: 0
+                  widgets: [{label: {align: CENTER, text_font: ui_18, text_color: "${c_panel}", text: "Record it"}}]
+                  on_click:
+                    - lambda: |-
+                        lv_obj_add_flag(id(offer_btn), LV_OBJ_FLAG_HIDDEN);
+                        id(want_rec) = id(last_phrase);
+                        if (id(consented) && !id(spk_id).empty()) { id(set_mode).execute(true); }
+                        else { lv_obj_clear_flag(id(vol_sheet), LV_OBJ_FLAG_HIDDEN); }
               - label: {id: said_lbl, align: BOTTOM_LEFT, width: 100%, long_mode: WRAP, text_font: ui_18, text_color: "${c_ink}", text: "Tap a phrase to say it."}
         - obj:
             id: heard_box
@@ -705,6 +723,8 @@ script:
       - lambda: |-
           if (n >= (int) id(shown).size()) return;
           int i = id(shown)[n];
+          id(last_phrase) = i;
+          lv_obj_add_flag(id(offer_btn), LV_OBJ_FLAG_HIDDEN);
           if (!id(rec_mode)) { id(send_phrase).execute(id(ph_keys)[i]); return; }
           if (id(recording) && id(rec_phrase) == i) { id(send_phrase).execute("stop"); return; }
           id(rec_phrase) = i;
@@ -728,6 +748,16 @@ script:
           lv_obj_set_style_text_color(id(mode_lbl), lv_color_hex(on ? ${c_panel} : ${c_ink}), LV_PART_MAIN);
           lv_label_set_text(id(said_lbl), on ? "Tap a phrase, read it aloud, tap it again (or Stop) to save." : "Tap a phrase to say it.");
           lv_label_set_text(id(heard_lbl), "—");
+          if (on && id(want_rec) >= 0) {                       // "Record it" brought us here: start that take
+            int i = id(want_rec); id(want_rec) = -1;
+            id(rec_phrase) = i;
+            std::string read = id(ph_trans)[i];
+            static std::string msg;
+            msg = read.empty() ? "No " + id(lang_code) + " text yet — say it in your own words:\n" + id(ph_texts)[i]
+                               : "Read aloud:\n" + read;
+            lv_label_set_text(id(said_lbl), msg.c_str());
+            id(send_phrase).execute("record");
+          }
 
   # POST /panel/<pid>?lang=xx and route the Nano's reply to the right bubble.
   - id: send_phrase
@@ -755,10 +785,13 @@ script:
           on_response:
             - lambda: |-
                 std::string say = body.substr(0, 200);
+                bool offer = false;
                 json::parse_json(body, [&](JsonObject root) -> bool {
                   if (root["say"].is<const char *>()) say = root["say"].as<std::string>();
+                  offer = root["offer_record"] | false;
                   return true;
                 });
+                if (offer && !id(rec_mode)) lv_obj_clear_flag(id(offer_btn), LV_OBJ_FLAG_HIDDEN);
                 if (pid == "record") {
                   id(recording) = true;
                   lv_label_set_text(id(mic_lbl), "■\nStop");

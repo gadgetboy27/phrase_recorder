@@ -244,6 +244,9 @@ class Handler(BaseHTTPRequestHandler):
                 take, meta = audio.stop()
                 if not take:
                     return self.reply(409, {"say": "Not recording"})
+                if lang in asr_worker.WHISPER_UNSUPPORTED and not (meta and meta.get("phrase")):
+                    return self.reply(200, {"say": f"Whisper has no {asr_worker.WHISPER_UNSUPPORTED[lang]} model yet — "
+                                                   "recordings of phrases in it are what will make that possible.", "text": None})
                 if meta and meta.get("phrase"):                       # file the take, then draft its text
                     batch_id, rec = panel_takes.file_take(take, meta["started_at_ms"], meta["lang"], meta["speaker"],
                                                           meta["phrase"], meta["read_text"], meta["translation_source"])
@@ -288,13 +291,14 @@ class Handler(BaseHTTPRequestHandler):
                 return self.reply(200, {"say": f"{tr or p['text']}  (learner recording)", "how": "recording",
                                         "key": action, "lang": lang, "file": best[2].name, "note": "learner recording"})
             audio.say(p["text"], "en")                                # fall back to English
+            offer = lang != "en"                                      # a volunteer recording would fix this
             if tr:
-                say, note = f"{tr}  (said in English — no {lang} voice)", "no Piper voice for " + lang
+                say, note = f"{tr}\nSaid in English — no {lang} voice. Record it?", "no Piper voice for " + lang
             elif lang == "en":
-                say, note = p["text"], None
+                say, note, offer = p["text"], None, False
             else:
-                say, note = f"{p['text']}  (no {lang} translation yet)", "no approved translation"
-            return self.reply(200, {"say": say, "how": "piper", "key": action, "lang": "en", "note": note})
+                say, note = f"{p['text']}\nNo {lang} version yet. Record it?", "no approved translation"
+            return self.reply(200, {"say": say, "how": "piper", "key": action, "lang": "en", "note": note, "offer_record": offer})
         except subprocess.CalledProcessError as e:
             log("subprocess failed:", e.cmd[0], (e.stderr or b"")[-300:])
             return self.reply(500, {"say": f"{e.cmd[0]} failed"})

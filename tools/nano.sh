@@ -36,7 +36,7 @@ start() {
   need_up || return
   ssh "$NANO_SSH" '
     if pgrep -x llama-server >/dev/null; then echo "llama-server already running"; exit 0; fi
-    cd ~/llama.cpp && nohup ./build/bin/llama-server -m ~/models/Qwen2.5-3B-Instruct-Q4_K_M.gguf -ngl 99 -c 2048 --port 8080 --host 127.0.0.1 >~/llama-server.log 2>&1 &
+    cd ~/llama.cpp && setsid -f ./build/bin/llama-server -m ~/models/Qwen2.5-3B-Instruct-Q4_K_M.gguf -ngl 99 -c 2048 --port 8080 --host 127.0.0.1 >~/llama-server.log 2>&1 </dev/null
     for i in $(seq 1 30); do curl -s localhost:8080/health | grep -q ok && { echo "llama-server up (${i}s)"; exit 0; }; sleep 1; done
     echo "llama-server did not come up — see ~/llama-server.log on the Nano"; tail -5 ~/llama-server.log
   '
