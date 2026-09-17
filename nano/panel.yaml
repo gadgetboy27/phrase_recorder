@@ -245,6 +245,35 @@ lvgl:
               - label: {id: resume_lbl, align: CENTER, text_font: ui_18, text: ""}
             on_click:
               - lambda: 'id(apply_pair).execute();'
+    # ================= 2b. "Translate to…" — its own screen so the step is unmistakable ==========
+    - id: page_to
+      bg_color: "${c_base}"
+      widgets:
+        - label: {align: TOP_LEFT, x: 16, y: 14, text_font: ui_22, text_color: "${c_ink}", text: "Phrase Recorder"}
+        - obj: {id: to_src_chip, align: TOP_RIGHT, x: -16, y: 10, width: 220, height: 44, bg_color: "${c_sage}", border_width: 0, radius: 12, pad_all: 0,
+                widgets: [{label: {id: to_src_lbl, align: CENTER, text_font: ui_18, text_color: "${c_panel}", text: "I speak English"}}]}
+        - button:
+            align: CENTER
+            y: -40
+            width: 560
+            height: 190
+            bg_color: "${c_steel}"
+            border_width: 0
+            radius: 24
+            pressed: {bg_color: "0x56698A"}
+            widgets:
+              - label: {align: CENTER, y: -14, text_font: ui_28, text_color: "${c_panel}", text: "Translate to…"}
+              - label: {align: CENTER, y: 30, text_font: ui_18, text_color: "0xDCE2EC", text: "tap to choose the patient's language"}
+            on_click:
+              - lambda: 'id(lang_step) = 1; id(show_langs).execute();'
+        - button:
+            align: CENTER
+            y: 120
+            width: 560
+            height: 64
+            widgets: [{label: {align: CENTER, text_font: ui_18, text: "Back — change the language I speak"}}]
+            on_click:
+              - lambda: 'id(lang_step) = 0; id(show_langs).execute();'
     # ================= 2/3. pick a language (used for both steps) =================
     - id: page_lang
       bg_color: "${c_base}"
@@ -261,7 +290,7 @@ lvgl:
             widgets: [{label: {align: CENTER, text_font: ui_18, text: "Back"}}]
             on_click:
               - lambda: |-
-                  if (id(lang_step) == 1) { id(lang_step) = 0; id(show_langs).execute(); }
+                  if (id(lang_step) == 1) { lv_scr_load(id(page_to)->obj); }
                   else { lv_scr_load(id(page_start)->obj); }
         - obj:
             id: lang_grid
@@ -629,7 +658,13 @@ script:
           if (n >= (int) id(lang_codes).size()) return;
           if (millis() - id(last_tap) < 500) return;          // one tap = one step
           id(last_tap) = millis();
-          if (id(lang_step) == 0) { id(src_idx) = n; id(lang_step) = 1; id(show_langs).execute(); return; }
+          if (id(lang_step) == 0) {
+            id(src_idx) = n;
+            static std::string t; t = "I speak " + id(lang_names)[n];
+            lv_label_set_text(id(to_src_lbl), t.c_str());
+            lv_scr_load(id(page_to)->obj);
+            return;
+          }
           if (n == id(src_idx)) return;
           id(dst_idx) = n;
           id(apply_pair).execute();
