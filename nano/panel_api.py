@@ -44,6 +44,11 @@ from pathlib import Path
 from urllib.parse import urlparse, parse_qs
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+try:                                    # pip3 install --user arabic-reshaper python-bidi
+    import arabic_reshaper
+    from bidi.algorithm import get_display
+except ImportError:                     # panel shows unshaped letters until installed
+    arabic_reshaper = get_display = None
 import asr_worker  # noqa: E402  (deployed alongside; whisper-cli + llama helpers)
 import panel_takes  # noqa: E402
 import panel_drafts  # noqa: E402
@@ -64,6 +69,17 @@ VOICE = {"en": "en_US-lessac-medium", "ar": "ar_JO-kareem-medium", "es": "es_ES-
 
 def log(*a):
     print(time.strftime("%H:%M:%S"), *a, file=sys.stderr, flush=True)
+
+
+ARABIC_SCRIPT = {"ar", "fa", "prs"}
+
+
+def for_panel(text, lang):
+    """Text as the panel's LVGL can draw it: Arabic script pre-joined and put in display order
+    (the panel has no bidi engine — enabling LVGL's crashed it). Everything else passes through."""
+    if text and lang in ARABIC_SCRIPT and arabic_reshaper:
+        return get_display(arabic_reshaper.reshape(text))
+    return text
 
 
 def load_phrases():
@@ -116,9 +132,15 @@ class Audio:
         return wav
 
     def say(self, text, lang, then=None):
-        """Speak text; `then` = (text, lang) to say straight after (e.g. a warning, then the phrase)."""
-        wavs = [self.synth(text, lang)] + ([self.synth(*then)] if then else [])
-        self.play(*wavs)
+        """Speak text; `then` = (text, lang) to say straight after (e.g. a warning, then the phrase).
+        Synthesis + playback run in the background so the panel gets its reply immediately."""
+        def run():
+            try:
+                wavs = [self.synth(text, lang)] + ([self.synth(*then)] if then else [])
+                self.play(*wavs)
+            except subprocess.CalledProcessError as e:
+                log("piper failed:", (e.stderr or b"")[-200:])
+        threading.Thread(target=run, daemon=True).start()
 
     def play(self, *wavs):
         with self.lock:
@@ -185,23 +207,24 @@ def speak_phrase(p, lang, names):
     recs = recording_index().get((p["key"], lang), []) if lang != "en" else []
     best = recs[0] if recs else None
     lname = names.get(lang, lang)
+    shown = for_panel(tr, lang) or p["text"]
     if best and best[0] <= SPEAKER_RANK["fluent"]:
         audio.play(best[2])
-        return {"say": tr or p["text"], "how": "recording", "lang": lang, "file": best[2].name, "note": None}
+        return {"say": shown, "how": "recording", "lang": lang, "file": best[2].name, "note": None}
     if tr and lang in VOICE:
         audio.say(tr, lang)
-        return {"say": tr, "how": "piper", "lang": lang, "note": None}
+        return {"say": shown, "how": "piper", "lang": lang, "note": None}
     if best:
         audio.play(best[2])
-        return {"say": tr or p["text"], "how": "recording", "lang": lang, "file": best[2].name, "note": "learner recording"}
+        return {"say": shown, "how": "recording", "lang": lang, "file": best[2].name, "note": "learner recording"}
     # English fallback — and say so, so nobody mistakes it for the translation
     if tr:
         warn, note = f"Sorry, I can't say that in {lname} yet.", f"No {lname} voice"
     else:
         warn, note = f"Sorry, I don't have that phrase in {lname} yet.", f"No {lname} version yet"
     audio.say(warn, "en", then=(p["text"], "en"))
-    return {"say": tr or p["text"], "how": "piper", "lang": "en", "note": note, "warning": warn,
-            "offer_record": True, "draft": panel_drafts.get(p, lang)}
+    return {"say": shown, "how": "piper", "lang": "en", "note": note, "warning": warn,
+            "offer_record": True, "draft": for_panel(panel_drafts.get(p, lang), lang)}
 
 
 def health():
@@ -247,10 +270,10 @@ class Handler(BaseHTTPRequestHandler):
                 "categories": d["categories"],
                 "drafts_pending": panel_drafts.pending(),
                 "phrases": [{"key": p["key"], "category": p["category"], "text": p["text"],
-                             "src_text": p["text"] if src == "en" else p["translations"].get(src),
-                             "src_draft": None if src == "en" or p["translations"].get(src) else panel_drafts.get(p, src),
-                             "translation": p["translations"].get(lang),
-                             "draft": None if lang == "en" or p["translations"].get(lang) else panel_drafts.get(p, lang),
+                             "src_text": p["text"] if src == "en" else for_panel(p["translations"].get(src), src),
+                             "src_draft": None if src == "en" or p["translations"].get(src) else for_panel(panel_drafts.get(p, src), src),
+                             "translation": for_panel(p["translations"].get(lang), lang),
+                             "draft": None if lang == "en" or p["translations"].get(lang) else for_panel(panel_drafts.get(p, lang), lang),
                              "recording": bool(recs.get((p["key"], lang)))} for p in d["phrases"]],
             })
         self.reply(404, {"error": "no such route"})
@@ -275,7 +298,7 @@ class Handler(BaseHTTPRequestHandler):
                 src = q.get("src", "en")
                 out = speak_phrase(p, src, names)
                 out["key"] = p["key"]
-                out["patient_text"] = p["translations"].get(lang) or p["text"]
+                out["patient_text"] = for_panel(p["translations"].get(lang), lang) or p["text"]
                 panel_drafts.log_turn("patient", kind="preset", key=p["key"], sourceText=out["patient_text"],
                                       translatedText=out["say"], how=out["how"])
                 return self.reply(200, out)
@@ -326,12 +349,12 @@ class Handler(BaseHTTPRequestHandler):
                     return self.reply(200, {"say": say, "text": text, "file": rec["file"], "batch": batch_id, "take": rec["take"]})
                 wl = asr_worker.WHISPER_LANG.get(lang, lang)
                 text = asr_worker.transcribe(WHISPER_MODEL, wl, [take])[str(take)]
-                out = {"say": text or "(nothing heard)", "text": text, "file": take.name}
+                out = {"say": for_panel(text, lang) or "(nothing heard)", "text": text, "file": take.name}
                 src = q.get("src", "en")
                 if text and lang != src and llama_up():
                     names = load_phrases()[1]
                     out["translated"] = to_language(text, names.get(lang, lang), names.get(src, "English"))
-                    out["say"] = f"{text} → {out['translated']}"
+                    out["say"] = f"{for_panel(text, lang)} → {for_panel(out['translated'], src)}"
                     if q.get("speak") == "1" and src in VOICE:
                         audio.say(out["translated"], src)
                     panel_drafts.log_turn("patient" if q.get("who") == "patient" else "clinician", kind="speech",

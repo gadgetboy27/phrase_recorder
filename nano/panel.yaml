@@ -31,6 +31,14 @@ esp32:
     type: esp-idf
     advanced:
       enable_idf_experimental_features: true
+    sdkconfig_options:
+      CONFIG_ESP_MAIN_TASK_STACK_SIZE: "32768"   # touch → HTTP → JSON → page build all run on this stack
+      # Internal RAM was down to a 7 KB largest block (Wi-Fi + LVGL + fonts + strings all internal);
+      # let malloc() use the 8 MB PSRAM for anything over 4 KB, keep a reserve for DMA/Wi-Fi.
+      CONFIG_SPIRAM_USE_MALLOC: y
+      CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL: "4096"
+      CONFIG_SPIRAM_MALLOC_RESERVE_INTERNAL: "49152"
+      CONFIG_SPIRAM_TRY_ALLOCATE_WIFI_LWIP: y
 
 psram:
   mode: octal
@@ -38,6 +46,9 @@ psram:
 
 logger:
   level: INFO
+  hardware_uart: UART0            # the board's UART1 USB-C socket (CH343) — crash backtraces land here
+  baud_rate: 115200
+
 
 api:
   reboot_timeout: 0s        # no Home Assistant; never reboot for lack of a client
@@ -168,7 +179,7 @@ font:
     id: ar_28
     size: 28
     bpp: 4
-    glyphs: &arabic "؀؁؂؃؄؅؆؇؈؉؊؋،؍؎؏ؘؙؚؐؑؒؓؔؕؖؗ؛؜؝؞؟ؠءآأؤإئابةتثجحخدذرزسشصضطظعغػؼؽؾؿـفقكلمنهوىيًٌٍَُِّْٕٖٜٟٓٔٗ٘ٙٚٛٝٞ٠١٢٣٤٥٦٧٨٩٪٫٬٭ٮٯٰٱٲٳٴٵٶٷٸٹٺٻټٽپٿڀځڂڃڄڅچڇڈډڊڋڌڍڎڏڐڑڒړڔڕږڗژڙښڛڜڝڞڟڠڡڢڣڤڥڦڧڨکڪګڬڭڮگڰڱڲڳڴڵڶڷڸڹںڻڼڽھڿۀہۂۃۄۅۆۇۈۉۊۋیۍێۏېۑےۓ۔ەۖۗۘۙۚۛۜ۝۞ۣ۟۠ۡۢۤۥۦۧۨ۩۪ۭ۫۬ۮۯ۰۱۲۳۴۵۶۷۸۹ۺۻۼ۽۾ۿﹰﹱﹲﹳﹴﹶﹷﹸﹹﹺﹻﹼﹽﹾﹿﺀﺁﺂﺃﺄﺅﺆﺇﺈﺉﺊﺋﺌﺍﺎﺏﺐﺑﺒﺓﺔﺕﺖﺗﺘﺙﺚﺛﺜﺝﺞﺟﺠﺡﺢﺣﺤﺥﺦﺧﺨﺩﺪﺫﺬﺭﺮﺯﺰﺱﺲﺳﺴﺵﺶﺷﺸﺹﺺﺻﺼﺽﺾﺿﻀﻁﻂﻃﻄﻅﻆﻇﻈﻉﻊﻋﻌﻍﻎﻏﻐﻑﻒﻓﻔﻕﻖﻗﻘﻙﻚﻛﻜﻝﻞﻟﻠﻡﻢﻣﻤﻥﻦﻧﻨﻩﻪﻫﻬﻭﻮﻯﻰﻱﻲﻳﻴﻵﻶﻷﻸﻹﻺﻻﻼ .,?!0123456789"
+    glyphs: &arabic "،؛؟ءآأؤإئابةتثجحخدذرزسشصضطظعغػؼؽؾؿـفقكلمنهوىي٠١٢٣٤٥٦٧٨٩پچژکگی۰۱۲۳۴۵۶۷۸۹ﭖﭗﭘﭙﭺﭻﭼﭽﮊﮋﮎﮏﮐﮑﮒﮓﮔﮕﯼﯽﯾﯿﹰﹱﹲﹳﹴﹶﹷﹸﹹﹺﹻﹼﹽﹾﹿﺀﺁﺂﺃﺄﺅﺆﺇﺈﺉﺊﺋﺌﺍﺎﺏﺐﺑﺒﺓﺔﺕﺖﺗﺘﺙﺚﺛﺜﺝﺞﺟﺠﺡﺢﺣﺤﺥﺦﺧﺨﺩﺪﺫﺬﺭﺮﺯﺰﺱﺲﺳﺴﺵﺶﺷﺸﺹﺺﺻﺼﺽﺾﺿﻀﻁﻂﻃﻄﻅﻆﻇﻈﻉﻊﻋﻌﻍﻎﻏﻐﻑﻒﻓﻔﻕﻖﻗﻘﻙﻚﻛﻜﻝﻞﻟﻠﻡﻢﻣﻤﻥﻦﻧﻨﻩﻪﻫﻬﻭﻮﻯﻰﻱﻲﻳﻴﻵﻶﻷﻸﻹﻺﻻﻼ .,?!0123456789"
   - file: gfonts://Noto Sans Arabic
     id: ar_18
     size: 18
@@ -186,6 +197,7 @@ globals:
   - {id: nano_base,  type: std::string, initial_value: '"${nano_url}"'}     # set from the SSID on connect
   - {id: nano_ok,    type: bool, initial_value: 'false'}
   - {id: polling,    type: bool, initial_value: 'false'}
+  - {id: need_load,  type: bool, initial_value: 'false'}                    # phrase reload requested; a timer runs it
   - {id: last_tap,   type: uint32_t, initial_value: '0'}
   - {id: cat_filter, type: std::string, initial_value: '""'}               # "" = all categories
   - {id: page,       type: int, initial_value: '0'}
@@ -467,6 +479,7 @@ lvgl:
                         if (id(consented) && !id(spk_id).empty()) { id(set_mode).execute(true); }
                         else { lv_obj_clear_flag(id(vol_sheet), LV_OBJ_FLAG_HIDDEN); }
               - label: {id: said_lbl, align: BOTTOM_LEFT, width: 100%, long_mode: WRAP, text_font: ui_18, text_color: "${c_ink}", text: "Tap a phrase to say it."}
+              - label: {id: said_lbl_ar, align: BOTTOM_LEFT, width: 100%, long_mode: WRAP, text_font: ar_18, text_color: "${c_ink}", text: "", hidden: true}
         - obj:
             id: heard_box
             align: BOTTOM_LEFT
@@ -482,6 +495,7 @@ lvgl:
             widgets:
               - label: {id: heard_who, align: TOP_RIGHT, text: "Heard", text_font: ui_18, text_color: "${c_steel}"}
               - label: {id: heard_lbl, align: BOTTOM_LEFT, width: 100%, long_mode: WRAP, text_font: ui_18, text_color: "${c_ink}", text: "—"}
+              - label: {id: heard_lbl_ar, align: BOTTOM_LEFT, width: 100%, long_mode: WRAP, text_font: ar_18, text_color: "${c_ink}", text: "", hidden: true}
         - button:
             id: mic_btn
             align: BOTTOM_RIGHT
@@ -550,6 +564,7 @@ lvgl:
             widgets:
               - label: {id: pt_result_who, align: TOP_LEFT, text_font: ui_14, text_color: "${c_muted}", text: "Reply, for the clinician"}
               - label: {id: pt_result, align: BOTTOM_LEFT, width: 100%, long_mode: WRAP, text_font: ui_18, text_color: "${c_ink}", text: "—"}
+              - label: {id: pt_result_ar, align: BOTTOM_LEFT, width: 100%, long_mode: WRAP, text_font: ar_18, text_color: "${c_ink}", text: "", hidden: true}
         - button:
             id: reply_mic
             align: BOTTOM_LEFT
@@ -679,6 +694,10 @@ interval:
   - interval: 5s
     then:
       - script.execute: check_nano
+  - interval: 300ms                      # queued reloads run here, from a clean stack
+    then:
+      - lambda: |-
+          if (id(need_load) && !id(polling)) { id(need_load) = false; ESP_LOGI("diag", "timer → load_phrases (running=%d)", (int) id(load_phrases).is_running()); id(load_phrases).execute(); }
   - interval: 600ms
     then:
       - lambda: |-
@@ -717,7 +736,7 @@ script:
                 lv_label_set_text(id(status_lbl), st.c_str());
                 bool first = !id(nano_ok);
                 id(nano_ok) = true;
-                if (first || id(ph_keys).empty()) id(load_phrases).execute();
+                if (first || id(ph_keys).empty()) id(need_load) = true;
           on_error:
             - lambda: |-
                 id(polling) = false;
@@ -729,13 +748,17 @@ script:
   # Fetch the phrase list for the current language and rebuild the dropdowns + grid.
   - id: load_phrases
     then:
+      - lambda: 'ESP_LOGI("diag", "load_phrases: GET %s/phrases?lang=%s&src=%s", id(nano_base).c_str(), id(lang_code).c_str(), id(src_code).c_str());'
       - http_request.get:
           url: !lambda return std::string(id(nano_base) + "/phrases?lang=") + id(lang_code) + "&src=" + id(src_code);
           capture_response: true
-          max_response_buffer_size: 32768
+          max_response_buffer_size: 16384
           on_response:
             - lambda: |-
-                json::parse_json(body, [](JsonObject root) -> bool {
+                ESP_LOGI("diag", "phrases response: %d bytes, heap free %u / largest %u, psram free %u",
+                         (int) body.size(), (unsigned) heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
+                         (unsigned) heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL), (unsigned) heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
+                bool ok = json::parse_json(body, [](JsonObject root) -> bool {
                   std::string copts = "All categories";
                   id(lang_codes).clear(); id(lang_names).clear();
                   for (JsonObject l : root["languages"].as<JsonArray>()) {
@@ -766,6 +789,7 @@ script:
                   lv_dropdown_set_selected(id(cat_dd)->obj, ci);
                   return true;
                 });
+                ESP_LOGI("diag", "parsed ok=%d: %d phrases, %d langs, %d replies; rendering", (int) ok, (int) id(ph_keys).size(), (int) id(lang_codes).size(), (int) id(replies).size());
                 // a remembered pair from last time → offer to resume
                 int n = id(lang_codes).size();
                 if (id(src_idx) >= 0 && id(src_idx) < n && id(dst_idx) >= 0 && id(dst_idx) < n) {
@@ -776,8 +800,10 @@ script:
                   lv_obj_add_flag(id(resume_btn), LV_OBJ_FLAG_HIDDEN);
                 }
                 id(render).execute();
+                ESP_LOGI("diag", "render done");
           on_error:
-            - lambda: 'lv_label_set_text(id(said_lbl), "Nano not reachable — check it is on.");'
+            - lambda: 'ESP_LOGE("diag", "phrases request failed");'
+            - lambda: 'set_text_any(id(said_lbl), id(said_lbl_ar), std::string("Nano not reachable — check it is on."));'
 
   # Lay the current page of the (filtered) phrase list onto the nine buttons.
   - id: render
@@ -883,12 +909,12 @@ script:
           lv_obj_set_style_bg_color(id(reply_mic), lv_color_hex(lang_colour(id(lang_code))), LV_PART_MAIN);
           lv_obj_set_style_bg_color(id(back_btn), lv_color_hex(lang_colour(id(src_code))), LV_PART_MAIN);
           id(last_used) = -1;
-          lv_label_set_text(id(said_lbl), "Tap a phrase to say it.");
-          lv_label_set_text(id(heard_lbl), "—");
+          set_text_any(id(said_lbl), id(said_lbl_ar), std::string("Tap a phrase to say it."));
+          set_text_any(id(heard_lbl), id(heard_lbl_ar), std::string("—"));
           id(page) = 0;
           id(set_turn).execute(0);
           lv_scr_load(id(main_page)->obj);
-          id(load_phrases).execute();
+          id(need_load) = true;
       - http_request.post:
           url: !lambda return id(nano_base) + "/panel/session?src=" + id(src_code) + "&dst=" + id(lang_code);
 
@@ -904,7 +930,7 @@ script:
           static std::string m;
           m = t == 0 ? "Clinician speaking — tap a phrase, or hold the mic to say something else"
                      : "Patient speaking — tap the mic, then Stop";
-          lv_label_set_text(id(said_lbl), m.c_str());
+          set_text_any(id(said_lbl), id(said_lbl_ar), std::string(m.c_str()));
 
   # Turn the device to the patient: what was just said, in their language, plus ways to answer.
   - id: show_patient
@@ -929,6 +955,7 @@ script:
           std::string bar = id(lang_names)[id(dst_idx)];
           if (id(ui_reply) >= 0 && script == 0 && !id(ph_trans)[id(ui_reply)].empty()) bar = id(ph_trans)[id(ui_reply)];
           else if (script != 1) bar = "Tap to reply  ·  " + bar;
+          if (has_arabic(bar)) bar = "Tap to reply  ·  " + id(lang_names)[id(dst_idx)];
           lv_label_set_text(id(reply_bar_lbl), bar.c_str());
           // preset replies
           lv_obj_t *btns[] = {id(r1), id(r2), id(r3), id(r4), id(r5), id(r6), id(r7), id(r8)};
@@ -950,7 +977,7 @@ script:
               lv_obj_add_flag(btns[n], LV_OBJ_FLAG_HIDDEN);
             }
           }
-          lv_label_set_text(id(pt_result), "—");
+          set_text_any(id(pt_result), id(pt_result_ar), std::string("—"));
           lv_scr_load(id(page_patient)->obj);
 
   - id: reply_tap
@@ -960,7 +987,7 @@ script:
       - lambda: |-
           if (n >= (int) id(replies).size()) return;
           id(set_turn).execute(1);
-          lv_label_set_text(id(pt_result), "…");
+          set_text_any(id(pt_result), id(pt_result_ar), std::string("…"));
       - http_request.post:
           url: !lambda return id(nano_base) + "/panel/reply/" + id(ph_keys)[id(replies)[n]] + "?lang=" + id(lang_code) + "&src=" + id(src_code);
           capture_response: true
@@ -972,10 +999,10 @@ script:
                   if (root["say"].is<const char *>()) say = root["say"].as<std::string>();
                   return true;
                 });
-                lv_label_set_text(id(pt_result), say.c_str());
-                lv_label_set_text(id(heard_lbl), say.c_str());
+                set_text_any(id(pt_result), id(pt_result_ar), std::string(say.c_str()));
+                set_text_any(id(heard_lbl), id(heard_lbl_ar), std::string(say.c_str()));
           on_error:
-            - lambda: 'lv_label_set_text(id(pt_result), "Nano not reachable");'
+            - lambda: 'set_text_any(id(pt_result), id(pt_result_ar), std::string("Nano not reachable"));'
 
   - id: tap
     parameters:
@@ -993,7 +1020,7 @@ script:
           static std::string msg;
           msg = read.empty() ? "No " + id(lang_code) + " text yet — say it in your own words:\n" + id(ph_texts)[i]
                              : "Read aloud:\n" + read;
-          lv_label_set_text(id(said_lbl), msg.c_str());
+          set_text_any(id(said_lbl), id(said_lbl_ar), std::string(msg.c_str()));
           id(send_phrase).execute("record");
 
   - id: set_mode
@@ -1007,8 +1034,8 @@ script:
           if (on) { static std::string t; t = "● Record mode · " + id(spk_id); lv_label_set_text(id(mode_lbl), t.c_str()); }
           lv_obj_set_style_bg_color(id(mode_btn), lv_color_hex(on ? ${c_amber} : ${c_panel}), LV_PART_MAIN);
           lv_obj_set_style_text_color(id(mode_lbl), lv_color_hex(on ? ${c_panel} : ${c_ink}), LV_PART_MAIN);
-          lv_label_set_text(id(said_lbl), on ? "Tap a phrase, read it aloud, tap it again (or Stop) to save." : "Tap a phrase to say it.");
-          lv_label_set_text(id(heard_lbl), "—");
+          set_text_any(id(said_lbl), id(said_lbl_ar), std::string(on ? "Tap a phrase, read it aloud, tap it again (or Stop) to save." : "Tap a phrase to say it."));
+          set_text_any(id(heard_lbl), id(heard_lbl_ar), std::string("—"));
           if (on && id(want_rec) >= 0) {                       // "Record it" brought us here: start that take
             int i = id(want_rec); id(want_rec) = -1;
             id(rec_phrase) = i;
@@ -1016,7 +1043,7 @@ script:
             static std::string msg;
             msg = read.empty() ? "No " + id(lang_code) + " text yet — say it in your own words:\n" + id(ph_texts)[i]
                                : "Read aloud:\n" + read;
-            lv_label_set_text(id(said_lbl), msg.c_str());
+            set_text_any(id(said_lbl), id(said_lbl_ar), std::string(msg.c_str()));
             id(send_phrase).execute("record");
           }
 
@@ -1026,10 +1053,10 @@ script:
       pid: string
     then:
       - lambda: |-
-          lv_obj_t *box = (id(turn) == 0 && !id(rec_mode)) ? id(said_lbl) : id(heard_lbl);
-          if (pid == "record") { lv_label_set_text(box, "Listening…"); }
-          else if (pid == "stop") { lv_label_set_text(box, "Transcribing…"); }
-          else { lv_label_set_text(id(said_lbl), "…"); }
+          const bool cl = (id(turn) == 0 && !id(rec_mode));
+          if (pid == "record") { set_text_any(cl ? id(said_lbl) : id(heard_lbl), cl ? id(said_lbl_ar) : id(heard_lbl_ar), "Listening…"); }
+          else if (pid == "stop") { set_text_any(cl ? id(said_lbl) : id(heard_lbl), cl ? id(said_lbl_ar) : id(heard_lbl_ar), "Transcribing…"); }
+          else { set_text_any(id(said_lbl), id(said_lbl_ar), std::string("…")); }
       - http_request.post:
           url: !lambda |-
             std::string u = std::string(id(nano_base) + "/panel/") + pid + "?lang=" + id(lang_code) + "&src=" + id(src_code);
@@ -1061,11 +1088,12 @@ script:
                   id(recording) = false; id(rec_phrase) = -1;
                   lv_label_set_text(id(mic_lbl), "●\nRecord");
                   lv_obj_set_style_bg_color(id(mic_btn), lv_color_hex(lang_colour(id(turn) == 0 ? id(src_code) : id(lang_code))), LV_PART_MAIN);
-                  lv_label_set_text((id(turn) == 0 && !id(rec_mode)) ? id(said_lbl) : id(heard_lbl), say.c_str());
-                  if (id(turn) == 1) lv_label_set_text(id(pt_result), say.c_str());
-                  if (id(rec_mode)) id(load_phrases).execute();      // the new take may add a ● to its phrase
+                  { const bool cl = (id(turn) == 0 && !id(rec_mode));
+                    set_text_any(cl ? id(said_lbl) : id(heard_lbl), cl ? id(said_lbl_ar) : id(heard_lbl_ar), say); }
+                  if (id(turn) == 1) set_text_any(id(pt_result), id(pt_result_ar), std::string(say.c_str()));
+                  if (id(rec_mode)) id(need_load) = true;             // the new take may add a ● to its phrase
                 } else {
-                  lv_label_set_text(id(said_lbl), say.c_str());
+                  set_text_any(id(said_lbl), id(said_lbl_ar), std::string(say.c_str()));
                   if (!id(rec_mode) && id(last_phrase) >= 0) {
                     id(last_used) = id(last_phrase);
                     id(render).execute();
@@ -1074,9 +1102,11 @@ script:
                 }
           on_error:
             - lambda: |-
-                lv_label_set_text(pid == "stop" || pid == "record" ? id(heard_lbl) : id(said_lbl), "Nano not reachable");
+                { const bool h = (pid == "stop" || pid == "record");
+                  set_text_any(h ? id(heard_lbl) : id(said_lbl), h ? id(heard_lbl_ar) : id(said_lbl_ar), "Nano not reachable"); }
 
 button:
   - platform: restart
     name: reboot
     id: reboot_btn
+

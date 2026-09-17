@@ -31,3 +31,22 @@ inline int lang_script(const std::string &code) {
   if (code == "hi" || code == "zh" || code == "yue" || code == "ja" || code == "ko" || code == "lo" || code == "pa") return -1;
   return 0;
 }
+
+// True if the text contains Arabic-script code points (U+0600–U+06FF, presentation forms).
+inline bool has_arabic(const std::string &s) {
+  for (size_t i = 0; i < s.size(); i++) {
+    unsigned char c = s[i];
+    if (c == 0xD8 || c == 0xD9 || c == 0xDA || c == 0xDB) return true;          // U+0600–U+06FF as UTF-8 lead bytes
+    if (c == 0xEF && i + 1 < s.size() && (unsigned char) s[i + 1] >= 0xAD) return true;  // U+FB50–U+FEFF
+  }
+  return false;
+}
+
+// Show `text` on whichever twin can draw it (Latin font vs Arabic font); hide the other.
+inline void set_text_any(lv_obj_t *latin, lv_obj_t *arabic, const std::string &text) {
+  const bool ar = has_arabic(text);
+  lv_obj_t *use = ar ? arabic : latin, *hide = ar ? latin : arabic;
+  lv_label_set_text(use, text.c_str());
+  lv_obj_clear_flag(use, LV_OBJ_FLAG_HIDDEN);
+  lv_obj_add_flag(hide, LV_OBJ_FLAG_HIDDEN);
+}
