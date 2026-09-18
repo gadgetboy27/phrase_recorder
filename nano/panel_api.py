@@ -193,7 +193,12 @@ def llama_up():
         return False
 
 
-def to_language(text, language, target="English"):
+def to_language(text, language, target="English", src_code=None, tgt_code=None):
+    """What a patient said, in the clinician's language: NLLB when we have it, else the llama-server."""
+    if src_code and tgt_code:
+        out = panel_drafts.nllb_translate(text, src_code, tgt_code)
+        if out:
+            return out
     body = {"messages": [
         {"role": "system", "content": f"Translate the patient's {language} sentence into plain {target}. "
                                       "Reply with the translation only."},
@@ -238,6 +243,7 @@ def health():
         "llama": llama_up(),
         "db": panel_takes.db_ok(),
         "drafts_pending": panel_drafts.pending(),
+        "translator": "nllb" if panel_drafts.nllb_available() else ("qwen" if llama_up() else None),
         "recording": audio.recording,
         "phrases": len(load_phrases()[0]),
     }
@@ -307,6 +313,7 @@ class Handler(BaseHTTPRequestHandler):
                 "languages": d["languages"],
                 "categories": d["categories"],
                 "drafts_pending": panel_drafts.pending(),
+        "translator": "nllb" if panel_drafts.nllb_available() else ("qwen" if llama_up() else None),
                 "phrases": [slim(p) for p in d["phrases"]],
             })
         self.reply(404, {"error": "no such route"})
@@ -384,9 +391,9 @@ class Handler(BaseHTTPRequestHandler):
                 text = asr_worker.transcribe(WHISPER_MODEL, wl, [take])[str(take)]
                 out = {"say": for_panel(text, lang) or "(nothing heard)", "text": text, "file": take.name}
                 src = q.get("src", "en")
-                if text and lang != src and llama_up():
+                if text and lang != src and (llama_up() or panel_drafts.nllb_available()):
                     names = load_phrases()[1]
-                    out["translated"] = to_language(text, names.get(lang, lang), names.get(src, "English"))
+                    out["translated"] = to_language(text, names.get(lang, lang), names.get(src, "English"), lang, src)
                     out["say"] = f"{for_panel(text, lang)} → {for_panel(out['translated'], src)}"
                     if q.get("speak") == "1" and src in VOICE:
                         audio.say(out["translated"], src)
