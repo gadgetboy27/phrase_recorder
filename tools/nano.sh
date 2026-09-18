@@ -88,6 +88,8 @@ hotspot() {
   esac
 }
 
+test()         { PYTHONPATH="$(python3 -c 'import esphome_glyphsets,os;print(os.path.dirname(os.path.dirname(esphome_glyphsets.__file__)))' 2>/dev/null)" tools/panel_test.py "$@"; }
+
 ingest()       { tools/ingest.py --phrases public/phrases.json "${1:-$HOME/Downloads}"; }
 push()         { need_up && tools/push.py --all; }
 bench()        { need_up && tools/bench.py "$@"; }
@@ -107,6 +109,7 @@ menu() {
   1) status        health, services, golden-set count
   2) start         start llama-server (Qwen) if it isn't running
   p) panel         deploy/restart the touch-panel API (nano/panel_api.py)
+  t) test          regression tests: panel fonts vs texts, Nano API per language, panel liveness
   h) hotspot       on|off|status — the Nano's PhraseKit Wi-Fi hotspot for demos
   3) ingest        validate zips/WAVs in ~/Downloads → staged/
   4) push          staged batches → Nano
@@ -118,7 +121,7 @@ menu() {
 EOF
     read -r -p "> " c
     case "$c" in
-      1|status) status ;; 2|start) start ;; p|panel) panel ;; h|hotspot) read -r -p "on/off/status? " m; hotspot "$m" ;; 3|ingest) ingest ;; 4|push) push ;;
+      1|status) status ;; 2|start) start ;; p|panel) panel ;; t|test) test ;; h|hotspot) read -r -p "on/off/status? " m; hotspot "$m" ;; 3|ingest) ingest ;; 4|push) push ;;
       5|bench) bench ;; 6|translations) translations ;; 7|backup) backup ;;
       8|shutdown) shutdown_nano ;; q|quit|"") break ;;
       *) echo "?" ;;
@@ -128,7 +131,7 @@ EOF
 
 case "${1:-}" in
   "") menu ;;
-  status|start|panel|hotspot|ingest|push|bench|translations|backup) f="$1"; shift; "$f" "$@" ;;
+  status|start|panel|hotspot|test|ingest|push|bench|translations|backup) f="$1"; shift; "$f" "$@" ;;
   shutdown) shutdown_nano ;;
   *) echo "usage: tools/nano.sh [status|start|panel|hotspot|ingest|push|bench|translations|backup|shutdown]"; exit 2 ;;
 esac

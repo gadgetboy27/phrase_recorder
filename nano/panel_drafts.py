@@ -55,7 +55,11 @@ def nllb_translate(text, src, tgt):
         tr, sp = _nllb
         toks = [NLLB_CODES[src]] + sp.encode(text, out_type=str) + ["</s>"]
         out = tr.translate_batch([toks], target_prefix=[[NLLB_CODES[tgt]]], beam_size=4, max_decoding_length=160)
-        return sp.decode([t for t in out[0].hypotheses[0] if t != NLLB_CODES[tgt]]).strip() or None
+        out_text = sp.decode([t for t in out[0].hypotheses[0] if t != NLLB_CODES[tgt]]).strip()
+        # NLLB signals "could not translate" with ⁇ and/or by echoing the source — that is not a draft
+        if not out_text or "⁇" in out_text or out_text.lower().strip(" .!?") == text.lower().strip(" .!?"):
+            return None
+        return out_text
 
 _lock = threading.Lock()
 _cache = json.loads(CACHE.read_text()) if CACHE.exists() else {}
