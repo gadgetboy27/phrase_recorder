@@ -134,7 +134,7 @@
 <script>
 // Phrase recorder v2 — see docs/data-contract.md. Everything this file
 // produces (WAV, filename, manifest.json, zip) is specified there.
-const APP_VERSION = "2.1.0";
+const APP_VERSION = "2.1.1";
 const MANIFEST_VERSION = 1;
 const CONSENT_TEXT_VERSION = 1;
 const CONSENT_TEXT =
@@ -186,11 +186,20 @@ async function sha256Hex(blob) {
 
 // ---------------------------------------------------------------------------
 // Phrase list — public/phrases.json, cached for offline use.
+// The touch panel shares this file; its own button labels (category panel_ui) are not phrases
+// for volunteers to record, so they are dropped here.
+const NOT_FOR_RECORDING = new Set(["panel_ui"]);
+function forRecorder(data) {
+  return Object.assign({}, data, {
+    categories: data.categories.filter((c) => !NOT_FOR_RECORDING.has(c.slug)),
+    phrases: data.phrases.filter((p) => !NOT_FOR_RECORDING.has(p.category)),
+  });
+}
 async function loadPhraseList() {
   try {
     const r = await fetch("phrases.json", { cache: "no-cache" });
     if (!r.ok) throw new Error("HTTP " + r.status);
-    const data = await r.json();
+    const data = forRecorder(await r.json());
     try { localStorage.setItem("phrases_cache", JSON.stringify(data)); } catch (_) {}
     return data;
   } catch (err) {
