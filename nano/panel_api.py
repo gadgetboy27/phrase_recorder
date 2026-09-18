@@ -36,6 +36,7 @@ import hashlib
 import json
 import os
 import signal
+import socket
 import subprocess
 import sys
 import threading
@@ -68,6 +69,7 @@ WORK = Path.home() / "phrase-recordings" / "_panel"      # tts cache + panel rec
 AUDIO_DEV = "plughw:0,0"                                # the USB PnP sound device: mic + speaker
 WHISPER_MODEL = "ggml-large-v3-turbo-q5_0.bin"
 PORT = 8765
+BEACON_PORT = 18511      # UDP: every 3 s, on every interface, {"nano": "http://<ip>:8765"} so the panel finds us on any Wi-Fi
 # Demo mode: speak an unverified machine translation (NLLB draft) when no approved text exists.
 # The panel still shows it amber as unverified. Set to False for clinical use.
 SPEAK_DRAFTS = True
@@ -280,6 +282,27 @@ def speak_phrase(p, lang, names):
             "offer_record": True, "draft": for_panel(panel_drafts.get(p, lang), lang)}
 
 
+def beacon():
+    """Broadcast our URL on each interface's subnet so the panel can find the Nano on whatever
+    network they both joined (home LAN, a phone hotspot, the PhraseKit hotspot). No fixed IPs."""
+    while True:
+        try:
+            out = subprocess.run(["ip", "-4", "-o", "addr"], capture_output=True, text=True).stdout
+            for line in out.splitlines():
+                parts = line.split()
+                if "brd" not in parts or parts[1] in ("lo", "docker0"):
+                    continue
+                ip, bcast = parts[3].split("/")[0], parts[parts.index("brd") + 1]
+                msg = json.dumps({"nano": f"http://{ip}:{PORT}"}).encode()
+                s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+                s.sendto(msg, (bcast, BEACON_PORT))
+                s.close()
+        except Exception as e:
+            log("beacon:", repr(e))
+        time.sleep(3)
+
+
 def health():
     return {
         "audio": Path("/proc/asound/card0").exists(),
@@ -471,5 +494,6 @@ class Handler(BaseHTTPRequestHandler):
 
 
 if __name__ == "__main__":
+    threading.Thread(target=beacon, daemon=True).start()
     log(f"panel api on :{PORT}", json.dumps(health()))
     ThreadingHTTPServer(("0.0.0.0", PORT), Handler).serve_forever()
