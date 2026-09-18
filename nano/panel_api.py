@@ -46,6 +46,10 @@ from pathlib import Path
 from urllib.parse import urlparse, parse_qs
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+try:                                    # pip3 install --user gTTS — Google's voices for languages Piper lacks
+    from gtts import gTTS
+except ImportError:
+    gTTS = None
 try:                                    # pip3 install --user arabic-reshaper python-bidi
     import arabic_reshaper
     from bidi.algorithm import get_display
@@ -67,6 +71,10 @@ PORT = 8765
 # Demo mode: speak an unverified machine translation (NLLB draft) when no approved text exists.
 # The panel still shows it amber as unverified. Set to False for clinical use.
 SPEAK_DRAFTS = True
+# Google TTS for the languages Piper has no voice for. Text is sent to Google once and the WAV
+# cached (WORK/tts_google), so pre-generate at home (GET /pregen?lang=xx) and the demo stays offline.
+# Synthetic audio never goes into audio_samples — it is playback only, not training data.
+GTTS_LANG = {"yue": "yue", "ja": "ja", "ko": "ko", "pa": "pa", "tl": "tl"}
 # Piper voices on the Nano, by our language code (docs/data-contract.md). No Māori voice yet.
 VOICE = {"en": "en_US-lessac-medium", "ar": "ar_JO-kareem-medium", "es": "es_ES-davefx-medium",
          "fa": "fa_IR-amir-medium", "prs": "fa_IR-amir-medium", "hi": "hi_IN-rohan-medium",
@@ -129,8 +137,19 @@ class Audio:
         self.take_meta = None       # None for a free transcription, else the volunteer/phrase context
 
     def synth(self, text, lang):
+        """WAV for text in lang: Piper when it has the voice, else Google (cached), else Piper English."""
+        h = hashlib.sha1(text.encode()).hexdigest()[:12]
+        if lang not in VOICE and lang in GTTS_LANG and gTTS:
+            wav = WORK / "tts_google" / f"{lang}_{h}.wav"
+            if not wav.exists():
+                wav.parent.mkdir(parents=True, exist_ok=True)
+                mp3 = wav.with_suffix(".mp3")
+                gTTS(text=text, lang=GTTS_LANG[lang]).save(str(mp3))          # needs internet; cached after
+                subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-i", str(mp3), "-ar", "22050", "-ac", "1", str(wav)], check=True)
+                mp3.unlink()
+            return wav
         voice = VOICE.get(lang, VOICE["en"])
-        wav = WORK / "tts" / f"{voice}_{hashlib.sha1(text.encode()).hexdigest()[:12]}.wav"
+        wav = WORK / "tts" / f"{voice}_{h}.wav"
         if not wav.exists():
             wav.parent.mkdir(parents=True, exist_ok=True)
             subprocess.run([str(PIPER), "--model", str(VOICES / f"{voice}.onnx"), "--output_file", str(wav)],
@@ -211,6 +230,24 @@ def to_language(text, language, target="English", src_code=None, tgt_code=None):
         return json.load(r)["choices"][0]["message"]["content"].strip()
 
 
+def has_voice(lang):
+    return lang in VOICE or (lang in GTTS_LANG and gTTS is not None)
+
+
+def pregen(lang):
+    """Synthesise every phrase (approved text or draft) in lang into the cache — run at home before a demo."""
+    phrases, _ = load_phrases()
+    n = 0
+    for p in phrases.values():
+        text = p["translations"].get(lang) or panel_drafts.get(p, lang)
+        if text:
+            try:
+                audio.synth(text, lang); n += 1
+            except Exception as e:
+                log("pregen failed:", p["key"], lang, repr(e))
+    log(f"pregen {lang}: {n} phrases cached")
+
+
 def speak_phrase(p, lang, names):
     """Say phrase p in lang: native/fluent recording → Piper on the approved text → learner recording →
     English with a spoken warning. Returns the panel's reply dict."""
@@ -222,16 +259,16 @@ def speak_phrase(p, lang, names):
     if best and best[0] <= SPEAKER_RANK["fluent"]:
         audio.play(best[2])
         return {"say": shown, "how": "recording", "lang": lang, "file": best[2].name, "note": None}
-    if tr and lang in VOICE:
+    if tr and has_voice(lang):
         audio.say(tr, lang)
-        return {"say": shown, "how": "piper", "lang": lang, "note": None}
+        return {"say": shown, "how": "piper" if lang in VOICE else "google", "lang": lang, "note": None}
     if best:
         audio.play(best[2])
         return {"say": shown, "how": "recording", "lang": lang, "file": best[2].name, "note": "learner recording"}
     draft = panel_drafts.get(p, lang)
-    if SPEAK_DRAFTS and draft and lang in VOICE and lang != "en":       # demo: voice the unverified draft
+    if SPEAK_DRAFTS and draft and has_voice(lang) and lang != "en":     # demo: voice the unverified draft
         audio.say(draft, lang)
-        return {"say": for_panel(draft, lang), "how": "piper-draft", "lang": lang,
+        return {"say": for_panel(draft, lang), "how": ("piper" if lang in VOICE else "google") + "-draft", "lang": lang,
                 "note": "unverified — machine translation", "draft": for_panel(draft, lang), "offer_record": True}
     # English fallback — and say so, so nobody mistakes it for the translation
     if tr:
@@ -280,6 +317,10 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         u = urlparse(self.path)
         q = {k: v[0] for k, v in parse_qs(u.query).items()}
+        if u.path == "/pregen":                         # cache Google/Piper audio for a language (background)
+            lang = q.get("lang", "")
+            threading.Thread(target=pregen, args=(lang,), daemon=True).start()
+            return self.reply(200, {"say": f"caching {lang} audio in the background — see ~/panel/panel.log"})
         if u.path == "/render":
             png = panel_render.render_text(q.get("text", ""), q.get("lang", "en"), int(q.get("size", 28)), int(q.get("w", 760)),
                                            q.get("fg", "1B2621"), q.get("bg", "F6F4EF"), q.get("align", "center"), int(q.get("lines", 3)))
@@ -403,7 +444,7 @@ class Handler(BaseHTTPRequestHandler):
                     names = load_phrases()[1]
                     out["translated"] = to_language(text, names.get(lang, lang), names.get(src, "English"), lang, src)
                     out["say"] = f"{for_panel(text, lang)} → {for_panel(out['translated'], src)}"
-                    if q.get("speak") == "1" and src in VOICE:
+                    if q.get("speak") == "1" and has_voice(src):
                         audio.say(out["translated"], src)
                     panel_drafts.log_turn("patient" if q.get("who") == "patient" else "clinician", kind="speech",
                                           sourceText=text, translatedText=out.get("translated"))
