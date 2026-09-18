@@ -50,3 +50,16 @@ inline void set_text_any(lv_obj_t *latin, lv_obj_t *arabic, const std::string &t
   lv_obj_clear_flag(use, LV_OBJ_FLAG_HIDDEN);
   lv_obj_add_flag(hide, LV_OBJ_FLAG_HIDDEN);
 }
+
+// Percent-encode for a query string.
+inline std::string url_encode(const std::string &s) {
+  static const char *hex = "0123456789ABCDEF";
+  std::string out;
+  for (unsigned char c : s) {
+    if (isalnum(c) || c == '-' || c == '_' || c == '.' || c == '~') out += (char) c;
+    else { out += '%'; out += hex[c >> 4]; out += hex[c & 15]; }
+  }
+  return out;
+}
+
+inline std::string hex6(uint32_t c) { char b[8]; snprintf(b, sizeof b, "%06X", (unsigned) c); return b; }

@@ -8,6 +8,8 @@
 survives a power cycle. Stdlib only — nothing to install on the Nano.
 
 Routes (JSON responses; the panel only reads the first ~60 chars of `say`):
+  GET  /render?text=&lang=&size=&w=&fg=&bg=&align=   PNG of shaped text for scripts the panel can't draw
+  GET  /render/replies?lang=&t0=&s0=&a0=1&t1=…       PNG strip of reply cells (sits behind the panel's buttons)
   GET  /health                 what the panel depends on: audio card, piper, whisper, llama-server
   GET  /phrases?lang=xx&src=yy {languages, categories, phrases:[{key, category, text, src_text,
                                translation, recording}]} — everything the panel needs to build its
@@ -52,6 +54,7 @@ except ImportError:                     # panel shows unshaped letters until ins
 import asr_worker  # noqa: E402  (deployed alongside; whisper-cli + llama helpers)
 import panel_takes  # noqa: E402
 import panel_drafts  # noqa: E402
+import panel_render  # noqa: E402
 
 HERE = Path(__file__).resolve().parent
 PHRASES = HERE / "phrases.json"
@@ -252,9 +255,29 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def send_png(self, path):
+        data = Path(path).read_bytes()
+        self.send_response(200)
+        self.send_header("Content-Type", "image/png")
+        self.send_header("Content-Length", str(len(data)))
+        self.end_headers()
+        self.wfile.write(data)
+
     def do_GET(self):
         u = urlparse(self.path)
         q = {k: v[0] for k, v in parse_qs(u.query).items()}
+        if u.path == "/render":
+            png = panel_render.render_text(q.get("text", ""), q.get("lang", "en"), int(q.get("size", 28)), int(q.get("w", 760)),
+                                           q.get("fg", "1B2621"), q.get("bg", "F6F4EF"), q.get("align", "center"), int(q.get("lines", 3)))
+            return self.send_png(png)
+        if u.path == "/render/replies":
+            cells = []
+            for i in range(8):
+                if f"t{i}" in q:
+                    cells.append({"t": q[f"t{i}"], "s": q.get(f"s{i}", ""), "amber": q.get(f"a{i}") == "1"})
+            png = panel_render.render_grid(cells, q.get("lang", "en"), int(q.get("w", 776)), int(q.get("h", 168)),
+                                           fg=q.get("fg", "1B2621"), bg=q.get("bg", "F6F4EF"))
+            return self.send_png(png)
         if u.path == "/health":
             return self.reply(200, health())
         if u.path == "/phrases":
