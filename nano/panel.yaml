@@ -45,7 +45,14 @@ psram:
   speed: 80MHz
 
 logger:
-  level: INFO
+  level: DEBUG
+  logs:
+    lvgl: INFO
+    wifi: INFO
+    api: INFO
+    scheduler: INFO
+    component: INFO
+    touch: INFO
   hardware_uart: UART0            # the board's UART1 USB-C socket (CH343) — crash backtraces land here
   baud_rate: 115200
 
@@ -122,6 +129,7 @@ online_image:
 
 http_request:
   verify_ssl: false
+  buffer_size_tx: 4096     # the reply-strip image URL carries eight encoded phrases (~1.5 KB)
   timeout: 30s          # stop → Whisper can take a few seconds
 
 i2c:
@@ -269,6 +277,9 @@ globals:
   - {id: phrase_url,  type: std::string, initial_value: '""'}
   - {id: replies_url, type: std::string, initial_value: '""'}
   - {id: mic_url,     type: std::string, initial_value: '""'}
+  - {id: need_images, type: bool, initial_value: 'false'}                   # fetch patient-page images (from the timer, never inside a response)
+  - {id: need_mic,    type: bool, initial_value: 'false'}
+  - {id: need_heard,  type: bool, initial_value: 'false'}
   - {id: ph_cats,    type: 'std::vector<std::string>'}
   - {id: ph_rec,     type: 'std::vector<bool>'}
   - {id: shown,      type: 'std::vector<int>'}                    # indices of the phrases on the current page
@@ -800,7 +811,10 @@ interval:
   - interval: 300ms                      # queued reloads run here, from a clean stack
     then:
       - lambda: |-
-          if (id(need_load) && !id(polling)) { id(need_load) = false; ESP_LOGD("diag", "timer → load_phrases (running=%d)", (int) id(load_phrases).is_running()); id(load_phrases).execute(); }
+          if (id(need_load) && !id(polling)) { id(need_load) = false; ESP_LOGD("diag", "timer → load_phrases (running=%d)", (int) id(load_phrases).is_running()); id(load_phrases).execute(); return; }
+          if (id(need_images) && !id(polling)) { id(need_images) = false; id(fetch_images).execute(); return; }
+          if (id(need_mic) && !id(polling)) { id(need_mic) = false; id(fetch_mic).execute(); return; }
+          if (id(need_heard) && !id(polling)) { id(need_heard) = false; id(fetch_heard).execute(); return; }
   - interval: 600ms
     then:
       - lambda: |-
@@ -1075,7 +1089,6 @@ script:
           lv_label_set_text(id(reply_bar_lbl), id(lang_names)[id(dst_idx)].c_str());
           // preset replies — in the patient's language (approved, else amber draft), English beneath
           id(replies_url) = id(nano_base) + "/render/replies?lang=" + id(lang_code);
-          id(phrase_url) = "";
           lv_obj_t *btns[] = {id(r1), id(r2), id(r3), id(r4), id(r5), id(r6), id(r7), id(r8)};
           lv_obj_t *dl[] = {id(rd1), id(rd2), id(rd3), id(rd4), id(rd5), id(rd6), id(rd7), id(rd8)};
           lv_obj_t *da[] = {id(rd1_ar), id(rd2_ar), id(rd3_ar), id(rd4_ar), id(rd5_ar), id(rd6_ar), id(rd7_ar), id(rd8_ar)};
@@ -1107,13 +1120,14 @@ script:
             }
           }
           id(mic_label).execute();
-          if (imgmode) id(fetch_images).execute();
+          if (imgmode) id(need_images) = true; else id(phrase_url) = "";
           set_text_any(id(pt_result), id(pt_result_ar), std::string("—"));
           lv_scr_load(id(page_patient)->obj);
 
   # Pull the Nano-rendered images for the patient page (only for scripts the panel can't draw).
   - id: fetch_images
     then:
+      - lambda: 'ESP_LOGI("img", "fetch: phrase=%d replies=%d mic=%d bytes", (int) id(phrase_url).size(), (int) id(replies_url).size(), (int) id(mic_url).size());'
       - online_image.set_url:
           id: img_phrase
           url: !lambda |-
@@ -1121,9 +1135,6 @@ script:
       - online_image.set_url:
           id: img_replies
           url: !lambda return id(replies_url);
-      - online_image.set_url:
-          id: img_mic
-          url: !lambda return id(mic_url);
 
   - id: fetch_mic
     then:
@@ -1143,7 +1154,7 @@ script:
           auto ui = [](int idx, const char *fallback) -> std::string {
             if (idx < 0) return fallback;
             if (!id(ph_trans)[idx].empty()) return id(ph_trans)[idx];
-            if (!id(ph_draft)[idx].empty() && lang_script(id(lang_code)) >= 0) return id(ph_draft)[idx];
+            if (!id(ph_draft)[idx].empty()) return id(ph_draft)[idx];
             return fallback;
           };
           std::string t;
@@ -1158,7 +1169,7 @@ script:
             // rendered by the Nano: hide the text labels, show the image (fetched by fetch_images / on change)
             lv_obj_add_flag(id(reply_mic_lbl), LV_OBJ_FLAG_HIDDEN); lv_obj_add_flag(id(reply_mic_lbl_ar), LV_OBJ_FLAG_HIDDEN);
             std::string u = id(nano_base) + "/render?lang=" + id(lang_code) + "&size=18&w=110&lines=2&fg=FFFFFF&bg=" + hex6(lang_colour(id(lang_code))) + "&text=" + url_encode(t);
-            if (u != id(mic_url)) { id(mic_url) = u; lv_obj_add_flag(id(mic_img), LV_OBJ_FLAG_HIDDEN); }
+            if (u != id(mic_url)) { id(mic_url) = u; lv_obj_add_flag(id(mic_img), LV_OBJ_FLAG_HIDDEN); id(need_mic) = true; }
           } else {
             set_text_any(id(reply_mic_lbl), id(reply_mic_lbl_ar), t + (secs[0] ? std::string("  ") + secs : ""));
             lv_obj_add_flag(id(mic_img), LV_OBJ_FLAG_HIDDEN);
@@ -1269,7 +1280,7 @@ script:
                 if (pid == "record") {
                   id(recording) = true;
                   id(rec_started) = millis();
-                  if (id(turn) == 1) { id(mic_label).execute(); if (lang_script(id(lang_code)) < 0) id(fetch_mic).execute(); }
+                  if (id(turn) == 1) { id(mic_label).execute(); if (lang_script(id(lang_code)) < 0) id(need_mic) = true; }
                   lv_label_set_text(id(mic_lbl), "■\nStop");
                   lv_obj_set_style_bg_color(id(mic_btn), lv_color_hex(${c_amber}), LV_PART_MAIN);
                 } else if (pid == "stop") {
@@ -1294,14 +1305,14 @@ script:
                     if (lang_script(id(lang_code)) < 0 && !heard.empty()) {
                       lv_obj_add_flag(id(rp_heard), LV_OBJ_FLAG_HIDDEN); lv_obj_add_flag(id(rp_heard_ar), LV_OBJ_FLAG_HIDDEN);
                       id(phrase_url) = id(nano_base) + "/render?lang=" + id(lang_code) + "&size=22&w=368&lines=8&align=left&text=" + url_encode(heard);
-                      id(fetch_heard).execute();
+                      id(need_heard) = true;
                     } else {
                       lv_obj_add_flag(id(rp_heard_img), LV_OBJ_FLAG_HIDDEN);
                     }
                     lv_scr_load(id(page_reply)->obj);
                   }
                   id(mic_label).execute();
-                  if (lang_script(id(lang_code)) < 0) id(fetch_mic).execute();
+                  if (lang_script(id(lang_code)) < 0) id(need_mic) = true;
                   if (id(rec_mode)) id(need_load) = true;             // the new take may add a ● to its phrase
                 } else {
                   set_text_any(id(said_lbl), id(said_lbl_ar), std::string(say.c_str()));
@@ -1320,4 +1331,15 @@ button:
   - platform: restart
     name: reboot
     id: reboot_btn
+  - platform: template          # test hook: open the patient page for phrase 1 in the current pair (web: /button/patient/press)
+    name: patient
+    on_press:
+      - lambda: |-
+          if (id(ph_keys).size() > 1) { id(set_turn).execute(0); id(show_patient).execute(1); }
+  - platform: template          # test hook: select English → Hindi as if by the wizard
+    name: pair_hi
+    on_press:
+      - lambda: |-
+          for (size_t i = 0; i < id(lang_codes).size(); i++) { if (id(lang_codes)[i] == "en") id(src_idx) = i; if (id(lang_codes)[i] == "hi") id(dst_idx) = i; }
+          id(apply_pair).execute();
 
