@@ -264,6 +264,20 @@
       "category": "panel_ui",
       "text": "Tap to reply",
       "translations": {}
+    },
+    {
+      "key": "p021",
+      "version": 1,
+      "category": "panel_ui",
+      "text": "Stop",
+      "translations": {}
+    },
+    {
+      "key": "p022",
+      "version": 1,
+      "category": "panel_ui",
+      "text": "Reply again",
+      "translations": {}
     }
   ]
 }

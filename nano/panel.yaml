@@ -181,6 +181,11 @@ font:
     bpp: 4
     glyphs: &arabic " !#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[]^_`abcdefghijklmnopqrstuvwxyz{|}~·ĀāĒēĪīŌōŪū،؛؟ءآأؤإئابةتثجحخدذرزسشصضطظعغػؼؽؾؿـفقكلمنهوىي٠١٢٣٤٥٦٧٨٩پچژکگی۰۱۲۳۴۵۶۷۸۹—…ﭖﭗﭘﭙﭺﭻﭼﭽﮊﮋﮎﮏﮐﮑﮒﮓﮔﮕﯼﯽﯾﯿﹰﹱﹲﹳﹴﹶﹷﹸﹹﹺﹻﹼﹽﹾﹿﺀﺁﺂﺃﺄﺅﺆﺇﺈﺉﺊﺋﺌﺍﺎﺏﺐﺑﺒﺓﺔﺕﺖﺗﺘﺙﺚﺛﺜﺝﺞﺟﺠﺡﺢﺣﺤﺥﺦﺧﺨﺩﺪﺫﺬﺭﺮﺯﺰﺱﺲﺳﺴﺵﺶﺷﺸﺹﺺﺻﺼﺽﺾﺿﻀﻁﻂﻃﻄﻅﻆﻇﻈﻉﻊﻋﻌﻍﻎﻏﻐﻑﻒﻓﻔﻕﻖﻗﻘﻙﻚﻛﻜﻝﻞﻟﻠﻡﻢﻣﻤﻥﻦﻧﻨﻩﻪﻫﻬﻭﻮﻯﻰﻱﻲﻳﻴﻵﻶﻷﻸﻹﻺﻻﻼ"
   - file: gfonts://Noto Sans Arabic
+    id: ar_22
+    size: 22
+    bpp: 4
+    glyphs: *arabic
+  - file: gfonts://Noto Sans Arabic
     id: ar_18
     size: 18
     bpp: 4
@@ -213,7 +218,10 @@ globals:
   - {id: last_used,  type: int, initial_value: '-1'}               # phrase index whose card wears the language colour
   - {id: cur_phrase, type: int, initial_value: '-1'}               # phrase shown on the patient page
   - {id: replies,    type: 'std::vector<int>'}                    # phrase indices in category patient_replies
-  - {id: ui_reply,   type: int, initial_value: '-1'}               # index of the "Tap to reply" phrase
+  - {id: ui_reply,   type: int, initial_value: '-1'}               # index of the "Tap to reply" phrase (p020)
+  - {id: ui_stop,    type: int, initial_value: '-1'}               # "Stop" (p021)
+  - {id: ui_again,   type: int, initial_value: '-1'}               # "Reply again" (p022)
+  - {id: rec_started, type: uint32_t, initial_value: '0'}          # millis() when the patient reply started
   - {id: ph_cats,    type: 'std::vector<std::string>'}
   - {id: ph_rec,     type: 'std::vector<bool>'}
   - {id: shown,      type: 'std::vector<int>'}                    # indices of the phrases on the current page
@@ -541,14 +549,14 @@ lvgl:
             pad_all: 0
             layout: {type: grid, grid_columns: [FR(1), FR(1), FR(1), FR(1)], grid_rows: [FR(1), FR(1)], pad_column: 8, pad_row: 8}
             widgets:
-              - button: {id: r1, grid_cell_column_pos: 0, grid_cell_row_pos: 0, grid_cell_x_align: STRETCH, grid_cell_y_align: STRETCH, pad_all: 4, hidden: true, widgets: [{label: {id: rd1, align: TOP_MID, y: 4, width: 96%, long_mode: WRAP, text_align: CENTER, text_font: ui_22, text: ""}}, {label: {id: rs1, align: BOTTOM_MID, y: -2, width: 96%, long_mode: WRAP, text_align: CENTER, text_font: ui_14, text_color: "${c_muted}", text: ""}}], on_click: {lambda: "id(reply_tap).execute(0);"}}
-              - button: {id: r2, grid_cell_column_pos: 1, grid_cell_row_pos: 0, grid_cell_x_align: STRETCH, grid_cell_y_align: STRETCH, pad_all: 4, hidden: true, widgets: [{label: {id: rd2, align: TOP_MID, y: 4, width: 96%, long_mode: WRAP, text_align: CENTER, text_font: ui_22, text: ""}}, {label: {id: rs2, align: BOTTOM_MID, y: -2, width: 96%, long_mode: WRAP, text_align: CENTER, text_font: ui_14, text_color: "${c_muted}", text: ""}}], on_click: {lambda: "id(reply_tap).execute(1);"}}
-              - button: {id: r3, grid_cell_column_pos: 2, grid_cell_row_pos: 0, grid_cell_x_align: STRETCH, grid_cell_y_align: STRETCH, pad_all: 4, hidden: true, widgets: [{label: {id: rd3, align: TOP_MID, y: 4, width: 96%, long_mode: WRAP, text_align: CENTER, text_font: ui_22, text: ""}}, {label: {id: rs3, align: BOTTOM_MID, y: -2, width: 96%, long_mode: WRAP, text_align: CENTER, text_font: ui_14, text_color: "${c_muted}", text: ""}}], on_click: {lambda: "id(reply_tap).execute(2);"}}
-              - button: {id: r4, grid_cell_column_pos: 3, grid_cell_row_pos: 0, grid_cell_x_align: STRETCH, grid_cell_y_align: STRETCH, pad_all: 4, hidden: true, widgets: [{label: {id: rd4, align: TOP_MID, y: 4, width: 96%, long_mode: WRAP, text_align: CENTER, text_font: ui_22, text: ""}}, {label: {id: rs4, align: BOTTOM_MID, y: -2, width: 96%, long_mode: WRAP, text_align: CENTER, text_font: ui_14, text_color: "${c_muted}", text: ""}}], on_click: {lambda: "id(reply_tap).execute(3);"}}
-              - button: {id: r5, grid_cell_column_pos: 0, grid_cell_row_pos: 1, grid_cell_x_align: STRETCH, grid_cell_y_align: STRETCH, pad_all: 4, hidden: true, widgets: [{label: {id: rd5, align: TOP_MID, y: 4, width: 96%, long_mode: WRAP, text_align: CENTER, text_font: ui_22, text: ""}}, {label: {id: rs5, align: BOTTOM_MID, y: -2, width: 96%, long_mode: WRAP, text_align: CENTER, text_font: ui_14, text_color: "${c_muted}", text: ""}}], on_click: {lambda: "id(reply_tap).execute(4);"}}
-              - button: {id: r6, grid_cell_column_pos: 1, grid_cell_row_pos: 1, grid_cell_x_align: STRETCH, grid_cell_y_align: STRETCH, pad_all: 4, hidden: true, widgets: [{label: {id: rd6, align: TOP_MID, y: 4, width: 96%, long_mode: WRAP, text_align: CENTER, text_font: ui_22, text: ""}}, {label: {id: rs6, align: BOTTOM_MID, y: -2, width: 96%, long_mode: WRAP, text_align: CENTER, text_font: ui_14, text_color: "${c_muted}", text: ""}}], on_click: {lambda: "id(reply_tap).execute(5);"}}
-              - button: {id: r7, grid_cell_column_pos: 2, grid_cell_row_pos: 1, grid_cell_x_align: STRETCH, grid_cell_y_align: STRETCH, pad_all: 4, hidden: true, widgets: [{label: {id: rd7, align: TOP_MID, y: 4, width: 96%, long_mode: WRAP, text_align: CENTER, text_font: ui_22, text: ""}}, {label: {id: rs7, align: BOTTOM_MID, y: -2, width: 96%, long_mode: WRAP, text_align: CENTER, text_font: ui_14, text_color: "${c_muted}", text: ""}}], on_click: {lambda: "id(reply_tap).execute(6);"}}
-              - button: {id: r8, grid_cell_column_pos: 3, grid_cell_row_pos: 1, grid_cell_x_align: STRETCH, grid_cell_y_align: STRETCH, pad_all: 4, hidden: true, widgets: [{label: {id: rd8, align: TOP_MID, y: 4, width: 96%, long_mode: WRAP, text_align: CENTER, text_font: ui_22, text: ""}}, {label: {id: rs8, align: BOTTOM_MID, y: -2, width: 96%, long_mode: WRAP, text_align: CENTER, text_font: ui_14, text_color: "${c_muted}", text: ""}}], on_click: {lambda: "id(reply_tap).execute(7);"}}
+              - button: {id: r1, grid_cell_column_pos: 0, grid_cell_row_pos: 0, grid_cell_x_align: STRETCH, grid_cell_y_align: STRETCH, pad_all: 4, hidden: true, widgets: [{label: {id: rd1, align: TOP_MID, y: 4, width: 96%, long_mode: WRAP, text_align: CENTER, text_font: ui_22, text: ""}}, {label: {id: rd1_ar, align: TOP_MID, y: 4, width: 96%, long_mode: WRAP, text_align: CENTER, text_font: ar_22, text: "", hidden: true}}, {label: {id: rs1, align: BOTTOM_MID, y: -2, width: 96%, long_mode: WRAP, text_align: CENTER, text_font: ui_14, text_color: "${c_muted}", text: ""}}], on_click: {lambda: "id(reply_tap).execute(0);"}}
+              - button: {id: r2, grid_cell_column_pos: 1, grid_cell_row_pos: 0, grid_cell_x_align: STRETCH, grid_cell_y_align: STRETCH, pad_all: 4, hidden: true, widgets: [{label: {id: rd2, align: TOP_MID, y: 4, width: 96%, long_mode: WRAP, text_align: CENTER, text_font: ui_22, text: ""}}, {label: {id: rd2_ar, align: TOP_MID, y: 4, width: 96%, long_mode: WRAP, text_align: CENTER, text_font: ar_22, text: "", hidden: true}}, {label: {id: rs2, align: BOTTOM_MID, y: -2, width: 96%, long_mode: WRAP, text_align: CENTER, text_font: ui_14, text_color: "${c_muted}", text: ""}}], on_click: {lambda: "id(reply_tap).execute(1);"}}
+              - button: {id: r3, grid_cell_column_pos: 2, grid_cell_row_pos: 0, grid_cell_x_align: STRETCH, grid_cell_y_align: STRETCH, pad_all: 4, hidden: true, widgets: [{label: {id: rd3, align: TOP_MID, y: 4, width: 96%, long_mode: WRAP, text_align: CENTER, text_font: ui_22, text: ""}}, {label: {id: rd3_ar, align: TOP_MID, y: 4, width: 96%, long_mode: WRAP, text_align: CENTER, text_font: ar_22, text: "", hidden: true}}, {label: {id: rs3, align: BOTTOM_MID, y: -2, width: 96%, long_mode: WRAP, text_align: CENTER, text_font: ui_14, text_color: "${c_muted}", text: ""}}], on_click: {lambda: "id(reply_tap).execute(2);"}}
+              - button: {id: r4, grid_cell_column_pos: 3, grid_cell_row_pos: 0, grid_cell_x_align: STRETCH, grid_cell_y_align: STRETCH, pad_all: 4, hidden: true, widgets: [{label: {id: rd4, align: TOP_MID, y: 4, width: 96%, long_mode: WRAP, text_align: CENTER, text_font: ui_22, text: ""}}, {label: {id: rd4_ar, align: TOP_MID, y: 4, width: 96%, long_mode: WRAP, text_align: CENTER, text_font: ar_22, text: "", hidden: true}}, {label: {id: rs4, align: BOTTOM_MID, y: -2, width: 96%, long_mode: WRAP, text_align: CENTER, text_font: ui_14, text_color: "${c_muted}", text: ""}}], on_click: {lambda: "id(reply_tap).execute(3);"}}
+              - button: {id: r5, grid_cell_column_pos: 0, grid_cell_row_pos: 1, grid_cell_x_align: STRETCH, grid_cell_y_align: STRETCH, pad_all: 4, hidden: true, widgets: [{label: {id: rd5, align: TOP_MID, y: 4, width: 96%, long_mode: WRAP, text_align: CENTER, text_font: ui_22, text: ""}}, {label: {id: rd5_ar, align: TOP_MID, y: 4, width: 96%, long_mode: WRAP, text_align: CENTER, text_font: ar_22, text: "", hidden: true}}, {label: {id: rs5, align: BOTTOM_MID, y: -2, width: 96%, long_mode: WRAP, text_align: CENTER, text_font: ui_14, text_color: "${c_muted}", text: ""}}], on_click: {lambda: "id(reply_tap).execute(4);"}}
+              - button: {id: r6, grid_cell_column_pos: 1, grid_cell_row_pos: 1, grid_cell_x_align: STRETCH, grid_cell_y_align: STRETCH, pad_all: 4, hidden: true, widgets: [{label: {id: rd6, align: TOP_MID, y: 4, width: 96%, long_mode: WRAP, text_align: CENTER, text_font: ui_22, text: ""}}, {label: {id: rd6_ar, align: TOP_MID, y: 4, width: 96%, long_mode: WRAP, text_align: CENTER, text_font: ar_22, text: "", hidden: true}}, {label: {id: rs6, align: BOTTOM_MID, y: -2, width: 96%, long_mode: WRAP, text_align: CENTER, text_font: ui_14, text_color: "${c_muted}", text: ""}}], on_click: {lambda: "id(reply_tap).execute(5);"}}
+              - button: {id: r7, grid_cell_column_pos: 2, grid_cell_row_pos: 1, grid_cell_x_align: STRETCH, grid_cell_y_align: STRETCH, pad_all: 4, hidden: true, widgets: [{label: {id: rd7, align: TOP_MID, y: 4, width: 96%, long_mode: WRAP, text_align: CENTER, text_font: ui_22, text: ""}}, {label: {id: rd7_ar, align: TOP_MID, y: 4, width: 96%, long_mode: WRAP, text_align: CENTER, text_font: ar_22, text: "", hidden: true}}, {label: {id: rs7, align: BOTTOM_MID, y: -2, width: 96%, long_mode: WRAP, text_align: CENTER, text_font: ui_14, text_color: "${c_muted}", text: ""}}], on_click: {lambda: "id(reply_tap).execute(6);"}}
+              - button: {id: r8, grid_cell_column_pos: 3, grid_cell_row_pos: 1, grid_cell_x_align: STRETCH, grid_cell_y_align: STRETCH, pad_all: 4, hidden: true, widgets: [{label: {id: rd8, align: TOP_MID, y: 4, width: 96%, long_mode: WRAP, text_align: CENTER, text_font: ui_22, text: ""}}, {label: {id: rd8_ar, align: TOP_MID, y: 4, width: 96%, long_mode: WRAP, text_align: CENTER, text_font: ar_22, text: "", hidden: true}}, {label: {id: rs8, align: BOTTOM_MID, y: -2, width: 96%, long_mode: WRAP, text_align: CENTER, text_font: ui_14, text_color: "${c_muted}", text: ""}}], on_click: {lambda: "id(reply_tap).execute(7);"}}
         - obj:
             id: pt_result_box
             align: BOTTOM_LEFT
@@ -575,7 +583,8 @@ lvgl:
             bg_color: "${c_steel}"
             border_width: 0
             widgets:
-              - label: {id: reply_mic_lbl, align: CENTER, text_align: CENTER, text_font: ui_18, text_color: "${c_panel}", text: "●"}
+              - label: {id: reply_mic_lbl, align: CENTER, text_align: CENTER, width: 96%, long_mode: WRAP, text_font: ui_18, text_color: "${c_panel}", text: "●"}
+              - label: {id: reply_mic_lbl_ar, align: CENTER, text_align: CENTER, width: 96%, long_mode: WRAP, text_font: ar_18, text_color: "${c_panel}", text: "", hidden: true}
             on_click:
               - lambda: |-
                   id(set_turn).execute(1);
@@ -591,6 +600,48 @@ lvgl:
             border_width: 0
             widgets:
               - label: {align: CENTER, text_align: CENTER, text_font: ui_14, text_color: "${c_panel}", text: "Back to\nclinician"}
+            on_click:
+              - lambda: |-
+                  id(set_turn).execute(0);
+                  lv_scr_load(id(main_page)->obj);
+    # ================= 6. the patient's reply, translated for the clinician =================
+    - id: page_reply
+      bg_color: "${c_base}"
+      pad_all: 0
+      widgets:
+        - obj: {id: rp_bar_pt, align: TOP_LEFT, x: 0, width: 400, height: 48, bg_color: "${c_steel}", border_width: 0, radius: 0, pad_all: 0,
+                widgets: [{label: {id: rp_bar_pt_lbl, align: CENTER, text_font: ui_18, text_color: "${c_panel}", text: "Patient said"}}]}
+        - obj: {id: rp_bar_cl, align: TOP_RIGHT, x: 0, width: 400, height: 48, bg_color: "${c_sage}", border_width: 0, radius: 0, pad_all: 0,
+                widgets: [{label: {id: rp_bar_cl_lbl, align: CENTER, text_font: ui_18, text_color: "${c_panel}", text: "For the clinician"}}]}
+        - label: {id: rp_heard, align: TOP_LEFT, x: 16, y: 64, width: 368, long_mode: WRAP, text_font: ui_22, text_color: "${c_ink}", text: ""}
+        - label: {id: rp_heard_ar, align: TOP_LEFT, x: 16, y: 64, width: 368, long_mode: WRAP, text_font: ar_22, text_color: "${c_ink}", text: "", hidden: true}
+        - label: {id: rp_trans, align: TOP_LEFT, x: 416, y: 64, width: 368, long_mode: WRAP, text_font: ui_28, text_color: "${c_ink}", text: ""}
+        - label: {id: rp_trans_ar, align: TOP_LEFT, x: 416, y: 64, width: 368, long_mode: WRAP, text_font: ar_28, text_color: "${c_ink}", text: "", hidden: true}
+        - label: {id: rp_time, align: BOTTOM_LEFT, x: 16, y: -30, text_font: ui_18, text_color: "${c_muted}", text: ""}
+        - button:
+            id: rp_again
+            align: BOTTOM_MID
+            x: 40
+            y: -12
+            width: 220
+            height: 72
+            bg_color: "${c_steel}"
+            border_width: 0
+            widgets:
+              - label: {id: rp_again_lbl, align: CENTER, text_align: CENTER, text_font: ui_18, text_color: "${c_panel}", text: "Reply again"}
+              - label: {id: rp_again_lbl_ar, align: CENTER, text_align: CENTER, text_font: ar_18, text_color: "${c_panel}", text: "", hidden: true}
+            on_click:
+              - lambda: |-
+                  id(show_patient).execute(id(cur_phrase) >= 0 ? id(cur_phrase) : 0);
+        - button:
+            align: BOTTOM_RIGHT
+            x: -12
+            y: -12
+            width: 200
+            height: 72
+            bg_color: "${c_sage}"
+            border_width: 0
+            widgets: [{label: {align: CENTER, text_align: CENTER, text_font: ui_18, text_color: "${c_panel}", text: "Back to\nclinician"}}]
             on_click:
               - lambda: |-
                   id(set_turn).execute(0);
@@ -701,6 +752,7 @@ interval:
   - interval: 600ms
     then:
       - lambda: |-
+          if (id(recording) && id(turn) == 1) id(mic_label).execute();
           static bool on = false; on = !on;
           lv_obj_t *chip = id(turn) == 0 ? id(src_chip) : id(dst_chip);
           lv_obj_set_style_outline_width(chip, on ? 4 : 0, LV_PART_MAIN);
@@ -776,7 +828,10 @@ script:
                     id(ph_draft).push_back(p["draft"].is<const char *>() ? p["draft"].as<std::string>() : std::string());
                     std::string cat = p["category"].as<std::string>();
                     if (cat == "patient_replies") id(replies).push_back(id(ph_keys).size());
-                    if (cat == "panel_ui") id(ui_reply) = id(ph_keys).size();
+                    std::string k = p["key"].as<std::string>();
+                    if (k == "p020") id(ui_reply) = id(ph_keys).size();
+                    if (k == "p021") id(ui_stop) = id(ph_keys).size();
+                    if (k == "p022") id(ui_again) = id(ph_keys).size();
                     id(ph_trans).push_back(p["translation"].is<const char *>() ? p["translation"].as<std::string>() : std::string());
                     id(ph_src).push_back(p["src_text"].is<const char *>() ? p["src_text"].as<std::string>() : std::string());
                     id(ph_keys).push_back(p["key"].as<std::string>());
@@ -908,6 +963,9 @@ script:
           lv_obj_set_style_bg_color(id(reply_bar), lv_color_hex(lang_colour(id(lang_code))), LV_PART_MAIN);
           lv_obj_set_style_bg_color(id(reply_mic), lv_color_hex(lang_colour(id(lang_code))), LV_PART_MAIN);
           lv_obj_set_style_bg_color(id(back_btn), lv_color_hex(lang_colour(id(src_code))), LV_PART_MAIN);
+          lv_obj_set_style_bg_color(id(rp_bar_pt), lv_color_hex(lang_colour(id(lang_code))), LV_PART_MAIN);
+          lv_obj_set_style_bg_color(id(rp_again), lv_color_hex(lang_colour(id(lang_code))), LV_PART_MAIN);
+          lv_obj_set_style_bg_color(id(rp_bar_cl), lv_color_hex(lang_colour(id(src_code))), LV_PART_MAIN);
           id(last_used) = -1;
           set_text_any(id(said_lbl), id(said_lbl_ar), std::string("Tap a phrase to say it."));
           set_text_any(id(heard_lbl), id(heard_lbl_ar), std::string("—"));
@@ -952,24 +1010,21 @@ script:
           lv_label_set_text(id(pt_note), note.c_str());
           lv_label_set_text(id(pt_src), (id(ph_src)[i].empty() ? id(ph_texts)[i] : id(ph_src)[i]).c_str());
           // "Tap to reply" in their language, if we have it
-          std::string bar = id(lang_names)[id(dst_idx)];
-          if (id(ui_reply) >= 0 && script == 0 && !id(ph_trans)[id(ui_reply)].empty()) bar = id(ph_trans)[id(ui_reply)];
-          else if (script != 1) bar = "Tap to reply  ·  " + bar;
-          if (has_arabic(bar)) bar = "Tap to reply  ·  " + id(lang_names)[id(dst_idx)];
-          lv_label_set_text(id(reply_bar_lbl), bar.c_str());
-          // preset replies
+          lv_label_set_text(id(reply_bar_lbl), id(lang_names)[id(dst_idx)].c_str());
+          // preset replies — in the patient's language (approved, else amber draft), English beneath
           lv_obj_t *btns[] = {id(r1), id(r2), id(r3), id(r4), id(r5), id(r6), id(r7), id(r8)};
           lv_obj_t *dl[] = {id(rd1), id(rd2), id(rd3), id(rd4), id(rd5), id(rd6), id(rd7), id(rd8)};
+          lv_obj_t *da[] = {id(rd1_ar), id(rd2_ar), id(rd3_ar), id(rd4_ar), id(rd5_ar), id(rd6_ar), id(rd7_ar), id(rd8_ar)};
           lv_obj_t *sl[] = {id(rs1), id(rs2), id(rs3), id(rs4), id(rs5), id(rs6), id(rs7), id(rs8)};
           for (int n = 0; n < 8; n++) {
             if (n < (int) id(replies).size()) {
               int r = id(replies)[n];
               std::string t = id(ph_trans)[r];
               bool draft = false;
-              if (t.empty() && !id(ph_draft)[r].empty() && script == 0) { t = id(ph_draft)[r]; draft = true; }
-              if (t.empty() || script != 0) t = id(ph_texts)[r];
-              lv_label_set_text(dl[n], t.c_str());
-              lv_obj_set_style_text_color(dl[n], lv_color_hex(draft ? ${c_amber} : ${c_ink}), LV_PART_MAIN);
+              if (t.empty() && !id(ph_draft)[r].empty()) { t = id(ph_draft)[r]; draft = true; }
+              if (t.empty() || script < 0) t = id(ph_texts)[r];
+              set_text_any(dl[n], da[n], t);
+              lv_obj_set_style_text_color(has_arabic(t) ? da[n] : dl[n], lv_color_hex(draft ? ${c_amber} : ${c_ink}), LV_PART_MAIN);
               lv_label_set_text(sl[n], (id(ph_src)[r].empty() ? id(ph_texts)[r] : id(ph_src)[r]).c_str());
               lv_obj_set_style_border_color(btns[n], lv_color_hex(lang_colour(id(lang_code))), LV_PART_MAIN);
               lv_obj_clear_flag(btns[n], LV_OBJ_FLAG_HIDDEN);
@@ -977,8 +1032,29 @@ script:
               lv_obj_add_flag(btns[n], LV_OBJ_FLAG_HIDDEN);
             }
           }
+          id(mic_label).execute();
           set_text_any(id(pt_result), id(pt_result_ar), std::string("—"));
           lv_scr_load(id(page_patient)->obj);
+
+  # The patient's mic button, in their language: "Tap to reply" / "Stop · 12 s" while recording.
+  - id: mic_label
+    then:
+      - lambda: |-
+          auto ui = [](int idx, const char *fallback) -> std::string {
+            if (idx < 0) return fallback;
+            if (!id(ph_trans)[idx].empty()) return id(ph_trans)[idx];
+            if (!id(ph_draft)[idx].empty() && lang_script(id(lang_code)) >= 0) return id(ph_draft)[idx];
+            return fallback;
+          };
+          std::string t;
+          if (id(recording) && id(turn) == 1) {
+            char secs[16]; snprintf(secs, sizeof secs, "  %lu s", (unsigned long) ((millis() - id(rec_started)) / 1000));
+            t = "■ " + ui(id(ui_stop), "Stop") + secs;
+          } else {
+            t = "● " + ui(id(ui_reply), "Tap to reply");
+          }
+          set_text_any(id(reply_mic_lbl), id(reply_mic_lbl_ar), t);
+          set_text_any(id(rp_again_lbl), id(rp_again_lbl_ar), ui(id(ui_again), "Reply again"));
 
   - id: reply_tap
     parameters:
@@ -1082,6 +1158,8 @@ script:
                 if (offer && !id(rec_mode)) lv_obj_clear_flag(id(offer_btn), LV_OBJ_FLAG_HIDDEN);
                 if (pid == "record") {
                   id(recording) = true;
+                  id(rec_started) = millis();
+                  if (id(turn) == 1) id(mic_label).execute();
                   lv_label_set_text(id(mic_lbl), "■\nStop");
                   lv_obj_set_style_bg_color(id(mic_btn), lv_color_hex(${c_amber}), LV_PART_MAIN);
                 } else if (pid == "stop") {
@@ -1091,6 +1169,21 @@ script:
                   { const bool cl = (id(turn) == 0 && !id(rec_mode));
                     set_text_any(cl ? id(said_lbl) : id(heard_lbl), cl ? id(said_lbl_ar) : id(heard_lbl_ar), say); }
                   if (id(turn) == 1) set_text_any(id(pt_result), id(pt_result_ar), std::string(say.c_str()));
+                  if (id(turn) == 1 && !id(rec_mode)) {
+                    std::string heard, translated;
+                    json::parse_json(body, [&](JsonObject root) -> bool {
+                      if (root["text"].is<const char *>()) heard = root["text"].as<std::string>();
+                      if (root["translated"].is<const char *>()) translated = root["translated"].as<std::string>();
+                      return true;
+                    });
+                    if (heard.empty()) heard = say;
+                    set_text_any(id(rp_heard), id(rp_heard_ar), heard);
+                    set_text_any(id(rp_trans), id(rp_trans_ar), translated.empty() ? "(no translation — is the translator running?)" : translated);
+                    char t[48]; snprintf(t, sizeof t, "Reply took %lu s", (unsigned long) ((millis() - id(rec_started)) / 1000));
+                    lv_label_set_text(id(rp_time), t);
+                    lv_scr_load(id(page_reply)->obj);
+                  }
+                  id(mic_label).execute();
                   if (id(rec_mode)) id(need_load) = true;             // the new take may add a ● to its phrase
                 } else {
                   set_text_any(id(said_lbl), id(said_lbl_ar), std::string(say.c_str()));
