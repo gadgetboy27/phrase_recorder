@@ -64,6 +64,9 @@ WORK = Path.home() / "phrase-recordings" / "_panel"      # tts cache + panel rec
 AUDIO_DEV = "plughw:0,0"                                # the USB PnP sound device: mic + speaker
 WHISPER_MODEL = "ggml-large-v3-turbo-q5_0.bin"
 PORT = 8765
+# Demo mode: speak an unverified machine translation (NLLB draft) when no approved text exists.
+# The panel still shows it amber as unverified. Set to False for clinical use.
+SPEAK_DRAFTS = True
 # Piper voices on the Nano, by our language code (docs/data-contract.md). No Māori voice yet.
 VOICE = {"en": "en_US-lessac-medium", "ar": "ar_JO-kareem-medium", "es": "es_ES-davefx-medium",
          "fa": "fa_IR-amir-medium", "prs": "fa_IR-amir-medium", "hi": "hi_IN-rohan-medium",
@@ -225,6 +228,11 @@ def speak_phrase(p, lang, names):
     if best:
         audio.play(best[2])
         return {"say": shown, "how": "recording", "lang": lang, "file": best[2].name, "note": "learner recording"}
+    draft = panel_drafts.get(p, lang)
+    if SPEAK_DRAFTS and draft and lang in VOICE and lang != "en":       # demo: voice the unverified draft
+        audio.say(draft, lang)
+        return {"say": for_panel(draft, lang), "how": "piper-draft", "lang": lang,
+                "note": "unverified — machine translation", "draft": for_panel(draft, lang), "offer_record": True}
     # English fallback — and say so, so nobody mistakes it for the translation
     if tr:
         warn, note = f"Sorry, I can't say that in {lname} yet.", f"No {lname} voice"
