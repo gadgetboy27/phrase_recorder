@@ -71,15 +71,18 @@ panel() {
 # for good (plan A); without it, `hotspot off` puts the Wi-Fi back on the home LAN (plan B).
 hotspot() {
   need_up || return
+  # The hotspot password lives only in nano/secrets.yaml (gitignored; the panel firmware reads the same key).
+  kit_pw=$(sed -n 's/^kit_password: *"\(.*\)"/\1/p' nano/secrets.yaml 2>/dev/null)
   case "${1:-status}" in
     on)
-      ssh "$NANO_SSH" '
+      [ -n "$kit_pw" ] || { echo "set kit_password in nano/secrets.yaml first (see nano/secrets.yaml.example)"; return 1; }
+      ssh "$NANO_SSH" "
         sudo -n nmcli -t -f NAME con show | grep -qx PhraseKit || {
           sudo -n nmcli con add type wifi ifname wlP1p1s0 con-name PhraseKit autoconnect yes connection.autoconnect-priority 10 ssid PhraseKit &&
-          sudo -n nmcli con modify PhraseKit 802-11-wireless.mode ap 802-11-wireless.band bg ipv4.method shared ipv4.addresses 10.42.0.1/24 \
-            wifi-sec.key-mgmt wpa-psk wifi-sec.psk "kit-2026-phrase"; }
-        echo "switching Wi-Fi to the PhraseKit hotspot (this SSH session will drop if it came in over Wi-Fi)"
-        setsid -f sudo -n nmcli con up PhraseKit >/dev/null 2>&1 </dev/null' ;;
+          sudo -n nmcli con modify PhraseKit 802-11-wireless.mode ap 802-11-wireless.band bg ipv4.method shared ipv4.addresses 10.42.0.1/24 \\
+            wifi-sec.key-mgmt wpa-psk wifi-sec.psk '$kit_pw'; }
+        echo 'switching Wi-Fi to the PhraseKit hotspot (this SSH session will drop if it came in over Wi-Fi)'
+        setsid -f sudo -n nmcli con up PhraseKit >/dev/null 2>&1 </dev/null" ;;
     off)
       ssh "$NANO_SSH" 'setsid -f sudo -n nmcli con up gadgetboy2 >/dev/null 2>&1 </dev/null; echo "Wi-Fi back on gadgetboy2 in a few seconds"' ;;
     status)
