@@ -143,6 +143,12 @@ def test_api():
 # ---- 3. panel liveness ------------------------------------------------------------------------
 def test_panel(secs=120):
     print(f"panel: watching {PANEL} for {secs}s")
+    for _ in range(30):                      # give a just-flashed panel up to 60 s to come back first
+        s = socket.socket(); s.settimeout(2)
+        try:
+            s.connect((PANEL, 6053)); s.close(); break
+        except OSError:
+            s.close(); time.sleep(2)
     ok = bad = 0
     end = time.time() + secs
     while time.time() < end:
