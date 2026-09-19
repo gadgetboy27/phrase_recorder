@@ -170,7 +170,7 @@ def add_phrase(text, category, phrases_path, speaker=None, take=None):
         started = calendar.timegm(time.strptime(m.group(0), "%Y%m%dT%H%M%SZ")) * 1000 if m else int(time.time() * 1000)
         phrase = {"key": key, "version": 1, "category": category, "text": text}
         try:
-            batch_id, rec = panel_takes.file_take(Path(take), started, "en", speaker, phrase, text, None)
+            batch_id, rec = panel_takes.file_take(Path(take), started, "en", speaker, phrase, text, "canonical")   # an English session
             out["file"], out["batch"] = rec["file"], batch_id
             out["say"] += f" — your recording is take {rec['take']}"
         except Exception as e:                           # the phrase is in; a lost take is not worth a 500
