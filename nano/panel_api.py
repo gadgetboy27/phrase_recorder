@@ -17,7 +17,8 @@ Routes (JSON responses; the panel only reads the first ~60 chars of `say`):
   POST /panel/<key>?lang=xx    say phrase <key> in xx. Preference order: a pushed recording by a
                                native/fluent speaker → Piper on the approved translation → a learner's
                                recording → Piper in English. Returns at once; playback runs in the
-                               background and a new tap cuts it off.
+                               background and a new tap cuts it off. `&repeat=1` marks the patient
+                               page's "Hear it again" in the session log.
   POST /panel/session?src=yy&dst=xx   start a session (turn log under ~/panel/sessions/)
   POST /panel/reply/<key>?lang=xx&src=yy
                                a preset patient reply: say phrase <key> in the clinician's language yy
@@ -483,7 +484,8 @@ class Handler(BaseHTTPRequestHandler):
             src = q.get("src", "en")
             out["src_text"] = p["text"] if src == "en" else (p["translations"].get(src) or p["text"])
             panel_drafts.log_turn("clinician", kind="phrase", key=p["key"], sourceText=out["src_text"],
-                                  translatedText=out["say"], how=out["how"], note=out.get("note"))
+                                  translatedText=out["say"], how=out["how"], note=out.get("note"),
+                                  repeat=q.get("repeat") == "1")          # "Hear it again" on the patient page
             return self.reply(200, out)
         except subprocess.CalledProcessError as e:
             log("subprocess failed:", e.cmd[0], (e.stderr or b"")[-300:])

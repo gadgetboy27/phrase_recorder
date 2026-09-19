@@ -278,6 +278,13 @@
       "category": "panel_ui",
       "text": "Reply again",
       "translations": {}
+    },
+    {
+      "key": "p023",
+      "version": 1,
+      "category": "panel_ui",
+      "text": "Hear it again",
+      "translations": {}
     }
   ]
 }
