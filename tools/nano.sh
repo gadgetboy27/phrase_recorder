@@ -2,7 +2,7 @@
 # Day-to-day menu for the Nano, from the Mac.
 #
 #   tools/nano.sh            # interactive menu
-#   tools/nano.sh status     # or any item by name: status start panel hotspot ingest push bench translations backup shutdown
+#   tools/nano.sh status     # or any item by name: status start panel hotspot fonts test ingest push bench translations backup reboot shutdown
 #
 # Sets the env the other tools need (NANO_SSH, NANO_DEST, PG_DSN, libpq on PATH)
 # so nothing has to be exported by hand. Password for Postgres comes from ~/.pgpass.
@@ -45,8 +45,12 @@ start() {
 # Touch panel API (nano/panel_api.py): copy it + its helpers over, (re)start it, keep it across reboots.
 panel() {
   need_up || return
+  # The panel can add phrases and languages itself now, so Postgres may be ahead of public/phrases.json:
+  # export first, so the copy we ship (and commit) is the database, never an older file over a newer one.
+  python3 tools/export_phrases.py || { echo "export_phrases failed — not deploying a possibly stale phrases.json"; return 1; }
   ssh "$NANO_SSH" 'mkdir -p ~/panel'
-  scp -q nano/panel_api.py nano/panel_takes.py nano/panel_drafts.py nano/panel_render.py nano/asr_worker.py tools/push.py public/phrases.json "$NANO_SSH:panel/"
+  scp -q nano/panel_api.py nano/panel_takes.py nano/panel_drafts.py nano/panel_render.py nano/panel_admin.py nano/asr_worker.py \
+         tools/push.py tools/export_phrases.py public/phrases.json "$NANO_SSH:panel/"
   # The API files volunteer takes into Postgres itself, so the Nano needs the app password: reuse the
   # Mac's ~/.pgpass entry as a localhost line (mode 600). Skipped, with a warning, if the Mac has none.
   pw=$(awk -F: -v h="$HOST" '$1 == h && $3 == "interpreter_data" && $4 == "interpreter_app" {print $5; exit}' ~/.pgpass 2>/dev/null)
@@ -91,6 +95,11 @@ hotspot() {
   esac
 }
 
+# Every Noto font the language table (nano/panel_admin.py) can need, into ~/panel/fonts — do this at home,
+# once, so "Add a language" on the panel never has to reach the internet at a demo.
+fonts()        { need_up && ssh "$NANO_SSH" 'cd ~/panel && python3 panel_admin.py fonts'; }
+reboot_nano()  { need_up && ssh "$NANO_SSH" 'sudo -n reboot' ; echo "rebooting — panel API and llama-server come back by cron in ~90 s"; }
+
 test()         { PYTHONPATH="$(python3 -c 'import esphome_glyphsets,os;print(os.path.dirname(os.path.dirname(esphome_glyphsets.__file__)))' 2>/dev/null)" tools/panel_test.py "$@"; }
 
 ingest()       { tools/ingest.py --phrases public/phrases.json "${1:-$HOME/Downloads}"; }
@@ -114,6 +123,8 @@ menu() {
   p) panel         deploy/restart the touch-panel API (nano/panel_api.py)
   t) test          regression tests: panel fonts vs texts, Nano API per language, panel liveness
   h) hotspot       on|off|status — the Nano's PhraseKit Wi-Fi hotspot for demos
+  f) fonts         fetch every Noto font "Add a language" could need (needs internet, once)
+  r) reboot        restart the Nano (services return by cron)
   3) ingest        validate zips/WAVs in ~/Downloads → staged/
   4) push          staged batches → Nano
   5) bench         score Whisper + Qwen against the golden set
@@ -125,6 +136,7 @@ EOF
     read -r -p "> " c
     case "$c" in
       1|status) status ;; 2|start) start ;; p|panel) panel ;; t|test) test ;; h|hotspot) read -r -p "on/off/status? " m; hotspot "$m" ;; 3|ingest) ingest ;; 4|push) push ;;
+      f|fonts) fonts ;; r|reboot) reboot_nano ;;
       5|bench) bench ;; 6|translations) translations ;; 7|backup) backup ;;
       8|shutdown) shutdown_nano ;; q|quit|"") break ;;
       *) echo "?" ;;
@@ -134,7 +146,8 @@ EOF
 
 case "${1:-}" in
   "") menu ;;
-  status|start|panel|hotspot|test|ingest|push|bench|translations|backup) f="$1"; shift; "$f" "$@" ;;
+  status|start|panel|hotspot|fonts|test|ingest|push|bench|translations|backup) f="$1"; shift; "$f" "$@" ;;
   shutdown) shutdown_nano ;;
-  *) echo "usage: tools/nano.sh [status|start|panel|hotspot|ingest|push|bench|translations|backup|shutdown]"; exit 2 ;;
+  reboot) reboot_nano ;;
+  *) echo "usage: tools/nano.sh [status|start|panel|hotspot|fonts|ingest|push|bench|translations|backup|reboot|shutdown]"; exit 2 ;;
 esac

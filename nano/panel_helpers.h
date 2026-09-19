@@ -2,8 +2,10 @@
 #pragma once
 #include <string>
 #include <cstdint>
+#include <map>
 
-// One colour per language, so a card/chip says which language it is in. Unknown codes → steel.
+// One colour per language, so a card/chip says which language it is in. Codes added from the
+// panel's "Add a language" get a stable colour from a small palette (never sage/steel/amber).
 inline uint32_t lang_colour(const std::string &code) {
   if (code == "en")  return 0x4A7A68;   // sage (brief §10)
   if (code == "mi")  return 0x1B7F79;
@@ -22,11 +24,19 @@ inline uint32_t lang_colour(const std::string &code) {
   if (code == "sm")  return 0x2A7A9B;
   if (code == "tl")  return 0x8A6D0E;
   if (code == "to")  return 0x3E6B3E;
-  return 0x6B7F9E;                      // steel
+  static const uint32_t extra[] = {0x7B4F9E, 0x2E7D6B, 0x9E5A2E, 0x3D6BA8, 0x8A2E5E, 0x5E7A1F, 0x1F7A8A, 0xA8552E};
+  uint32_t h = 5381;
+  for (unsigned char c : code) h = h * 33 + c;
+  return code.empty() ? 0x6B7F9E : extra[h % 8];
 }
 
-// Which of the panel's fonts can draw text in this language. 0 = Latin (Inter), 1 = Arabic script, -1 = none yet.
+// Which of the panel's fonts can draw text in this language. 0 = Latin (Inter), 1 = Arabic script,
+// -1 = none (the Nano renders it). The Nano says which in GET /phrases (languages[].script) and
+// load_phrases fills the map; the fallbacks cover the first languages before any reload.
+inline std::map<std::string, int> &lang_scripts() { static std::map<std::string, int> m; return m; }
 inline int lang_script(const std::string &code) {
+  auto it = lang_scripts().find(code);
+  if (it != lang_scripts().end()) return it->second;
   if (code == "ar" || code == "fa" || code == "prs") return 1;
   if (code == "hi" || code == "zh" || code == "yue" || code == "ja" || code == "ko" || code == "lo" || code == "pa") return -1;
   return 0;

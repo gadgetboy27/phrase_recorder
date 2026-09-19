@@ -312,6 +312,11 @@ globals:
   - {id: rec_phrase, type: int, initial_value: '-1'}               # phrase index being recorded, or -1
   - {id: want_rec,   type: int, initial_value: '-1'}               # phrase queued by "Record it" until Record mode is on
   - {id: last_phrase, type: int, initial_value: '-1'}              # phrase index of the last tap (for the offer)
+  - {id: lang_page,  type: int, initial_value: '0'}                # wizard: which 20 languages are on screen
+  - {id: add_recording, type: bool, initial_value: 'false'}        # "Add phrase" page: the mic is live
+  - {id: add_file,   type: std::string, initial_value: '""'}       # the take behind the text in the box (Nano tmp name)
+  - {id: add_lang_codes, type: 'std::vector<std::string>'}         # "Add a language" dropdown → codes
+  - {id: need_langs,  type: bool, initial_value: 'false'}                   # re-fetch /admin/languages (from the timer)
 
 lvgl:
   displays: [waveshare_display]
@@ -432,6 +437,13 @@ lvgl:
               - lambda: |-
                   if (id(lang_step) == 1) { lv_scr_load(id(page_to)->obj); }
                   else { lv_scr_load(id(page_start)->obj); }
+        # more than 20 languages: page through them (‹ › sit in the title row)
+        - button: {id: lp_prev, align: TOP_RIGHT, x: -244, y: 8, width: 52, height: 44, pad_all: 0, hidden: true,
+                   widgets: [{label: {align: CENTER, text: "‹", text_font: ui_28, text_color: "${c_muted}"}}],
+                   on_click: {lambda: "id(lang_page)--; id(show_langs).execute();"}}
+        - button: {id: lp_next, align: TOP_RIGHT, x: -144, y: 8, width: 52, height: 44, pad_all: 0, hidden: true,
+                   widgets: [{label: {align: CENTER, text: "›", text_font: ui_28, text_color: "${c_muted}"}}],
+                   on_click: {lambda: "id(lang_page)++; id(show_langs).execute();"}}
         - obj:
             id: lang_grid
             align: TOP_MID
@@ -490,12 +502,12 @@ lvgl:
             height: 44
             pad_all: 0
             widgets:
-              - label: {id: mode_lbl, align: CENTER, text_font: ui_18, text: "Speak  ·  Record"}
+              - label: {id: mode_lbl, align: CENTER, text_font: ui_18, text: "+ Add phrase"}
             on_click:
               - lambda: |-
-                  if (id(rec_mode)) { id(set_mode).execute(false); }
-                  else if (id(consented) && !id(spk_id).empty()) { id(set_mode).execute(true); }
-                  else { lv_obj_clear_flag(id(vol_sheet), LV_OBJ_FLAG_HIDDEN); }
+                  if (id(rec_mode)) { id(set_mode).execute(false); }                  // "done" ends Record mode
+                  else if (id(consented) && !id(spk_id).empty()) { id(add_open).execute(); }
+                  else { lv_obj_clear_flag(id(vol_sheet), LV_OBJ_FLAG_HIDDEN); }     // who is recording, and consent
         - dropdown:
             id: cat_dd
             align: TOP_RIGHT
@@ -773,100 +785,212 @@ lvgl:
               - lambda: |-
                   id(set_turn).execute(0);
                   lv_scr_load(id(main_page)->obj);
-        # ---- volunteer sheet: shown once before Record mode ----------------------------
-        - obj:
-            id: vol_sheet
-            align: CENTER
-            width: 800
-            height: 480
-            hidden: true
-            bg_color: "${c_base}"
+    # ================= 7. add to the phrasebook: a new phrase (spoken), translations, a language =================
+    - id: page_add
+      bg_color: "${c_base}"
+      pad_all: 0
+      widgets:
+        - label: {id: add_title, align: TOP_LEFT, x: 16, y: 12, text_font: ui_22, text_color: "${c_ink}", text: "Add to the phrasebook"}
+        - button:
+            align: TOP_LEFT
+            x: 360
+            y: 8
+            width: 110
+            height: 40
+            pad_all: 0
+            widgets: [{label: {align: CENTER, text_font: ui_18, text: "Back"}}]
+            on_click:
+              - lambda: |-
+                  if (id(add_recording)) { id(add_recording) = false; id(add_mic_tap).execute(); }
+                  lv_scr_load(id(main_page)->obj);
+        # ---- new phrase: say it in English, check the words, save ----
+        - label: {align: TOP_LEFT, x: 16, y: 56, text_font: ui_14, text_color: "${c_muted}", text: "New phrase — pick a category, tap ● and say it in English, tap ■. Fix the words if needed, then save."}
+        - dropdown:
+            id: add_cat
+            align: TOP_LEFT
+            x: 16
+            y: 78
+            width: 250
+            height: 44
+            symbol: "↓"
+            options: ["Intake"]
+            dropdown_list: {text_font: ui_18, bg_color: "${c_panel}", text_color: "${c_ink}", max_height: 300}
+        - button:
+            id: add_mic
+            align: TOP_LEFT
+            x: 282
+            y: 78
+            width: 188
+            height: 44
+            bg_color: "${c_sage}"
             border_width: 0
-            radius: 0
-            pad_all: 12
-            widgets:
-              - label: {align: TOP_LEFT, x: 4, y: 0, text_font: ui_22, text_color: "${c_ink}", text: "Volunteer recording"}
-              - label: {align: TOP_LEFT, x: 4, y: 40, text_font: ui_18, text_color: "${c_muted}", text: "Your initials (2–12 letters/digits)"}
-              - textarea:
-                  id: spk_ta
-                  align: TOP_LEFT
-                  x: 4
-                  y: 64
-                  width: 220
-                  height: 44
-                  one_line: true
-                  max_length: 12
-                  accepted_chars: "abcdefghijklmnopqrstuvwxyz0123456789"
-                  text_font: ui_22
-                  placeholder_text: "e.g. mg"
-              - label: {align: TOP_LEFT, x: 244, y: 40, text_font: ui_18, text_color: "${c_muted}", text: "I am a"}
-              - dropdown:
-                  id: type_dd
-                  align: TOP_LEFT
-                  x: 244
-                  y: 64
-                  width: 220
-                  height: 44
-                  symbol: "↓"
-                  options: ["native speaker", "fluent speaker", "learner", "staff"]
-                  dropdown_list: {text_font: ui_18, bg_color: "${c_panel}", text_color: "${c_ink}"}
-                  on_value:
-                    - lambda: |-
-                        static const char *t[] = {"native", "fluent", "learner", "staff"};
-                        id(spk_type) = t[x];
-              - label:
-                  align: TOP_LEFT
-                  x: 4
-                  y: 116
-                  width: 460
-                  long_mode: WRAP
-                  text_font: ui_18
-                  text_color: "${c_ink}"
-                  text: "I confirm I am recording my own voice reading clinical phrases for the local medical interpreter project. I agree these recordings may be stored on the practice's own equipment and used to test and train its interpretation system. No patient information is involved. I can ask for my recordings to be deleted by quoting my speaker ID."
-              - checkbox:
-                  id: consent_cb
-                  align: TOP_LEFT
-                  x: 4
-                  y: 262
-                  text: " I agree"
-                  text_font: ui_22
-                  text_color: "${c_ink}"
-                  on_value:
-                    - lambda: 'id(consented) = x;'
-              - button:
-                  align: BOTTOM_LEFT
-                  x: 4
-                  y: -4
-                  width: 150
-                  height: 52
-                  widgets: [{label: {align: CENTER, text: "Cancel"}}]
-                  on_click:
-                    - lambda: 'lv_obj_add_flag(id(vol_sheet), LV_OBJ_FLAG_HIDDEN);'
-              - button:
-                  id: start_btn
-                  align: BOTTOM_LEFT
-                  x: 170
-                  y: -4
-                  width: 290
-                  height: 52
-                  bg_color: "${c_sage}"
-                  widgets: [{label: {align: CENTER, text: "Start recording", text_color: "${c_panel}"}}]
-                  on_click:
-                    - lambda: |-
-                        std::string sid = lv_textarea_get_text(id(spk_ta));
-                        if (sid.size() < 2) { lv_textarea_set_placeholder_text(id(spk_ta), "initials?"); return; }
-                        if (!id(consented)) { lv_obj_set_style_text_color(id(consent_cb), lv_color_hex(0xA63D40), LV_PART_MAIN); return; }
-                        id(spk_id) = sid;
-                        lv_obj_add_flag(id(vol_sheet), LV_OBJ_FLAG_HIDDEN);
-                        id(set_mode).execute(true);
-              - keyboard:
-                  id: kb
-                  align: RIGHT_MID
-                  x: 0
-                  width: 300
-                  height: 440
-                  textarea: spk_ta
-                  mode: TEXT_LOWER
+            widgets: [{label: {id: add_mic_lbl, align: CENTER, text_font: ui_18, text_color: "${c_panel}", text: "●  Say it"}}]
+            on_click:
+              - lambda: 'id(add_mic_tap).execute();'
+        - textarea:
+            id: add_ta
+            align: TOP_LEFT
+            x: 16
+            y: 132
+            width: 454
+            height: 96
+            max_length: 200
+            text_font: ui_18
+            placeholder_text: "The words appear here — tap to edit"
+        - button:
+            id: add_save
+            align: TOP_LEFT
+            x: 16
+            y: 238
+            width: 200
+            height: 48
+            bg_color: "${c_sage}"
+            border_width: 0
+            widgets: [{label: {align: CENTER, text_font: ui_18, text_color: "${c_panel}", text: "Save phrase"}}]
+            on_click:
+              - lambda: 'id(add_save_tap).execute();'
+        - label: {id: add_status, align: TOP_LEFT, x: 16, y: 294, width: 454, long_mode: WRAP, text_font: ui_14, text_color: "${c_amber}", text: ""}
+        # ---- a language the kit does not have yet ----
+        - label: {align: TOP_LEFT, x: 16, y: 344, text_font: ui_14, text_color: "${c_muted}", text: "Add a language (Whisper hears it, NLLB drafts it; a font may download)"}
+        - dropdown:
+            id: add_lang_dd
+            align: TOP_LEFT
+            x: 16
+            y: 366
+            width: 300
+            height: 44
+            symbol: "↓"
+            options: ["loading…"]
+            dropdown_list: {text_font: ui_18, bg_color: "${c_panel}", text_color: "${c_ink}", max_height: 300}
+        - button:
+            align: TOP_LEFT
+            x: 332
+            y: 366
+            width: 138
+            height: 44
+            bg_color: "${c_steel}"
+            border_width: 0
+            widgets: [{label: {align: CENTER, text_font: ui_18, text_color: "${c_panel}", text: "Add"}}]
+            on_click:
+              - lambda: 'id(add_lang_tap).execute();'
+        # ---- translations: the existing Record mode, entered from here ----
+        - button:
+            align: TOP_LEFT
+            x: 16
+            y: 424
+            width: 454
+            height: 44
+            bg_color: "${c_amber}"
+            border_width: 0
+            widgets: [{label: {id: add_rec_lbl, align: CENTER, text_font: ui_18, text_color: "${c_panel}", text: "Record translations →"}}]
+            on_click:
+              - lambda: |-
+                  id(set_mode).execute(true);
+                  lv_scr_load(id(main_page)->obj);
+        - keyboard:
+            align: RIGHT_MID
+            x: 0
+            width: 310
+            height: 440
+            textarea: add_ta
+            mode: TEXT_LOWER
+
+  top_layer:
+    widgets:
+      # ---- volunteer sheet: who is recording + consent; a top-layer overlay so any page can raise it ----
+      - obj:
+          id: vol_sheet
+          align: CENTER
+          width: 800
+          height: 480
+          hidden: true
+          bg_color: "${c_base}"
+          border_width: 0
+          radius: 0
+          pad_all: 12
+          widgets:
+            - label: {align: TOP_LEFT, x: 4, y: 0, text_font: ui_22, text_color: "${c_ink}", text: "Volunteer recording"}
+            - label: {align: TOP_LEFT, x: 4, y: 40, text_font: ui_18, text_color: "${c_muted}", text: "Your initials (2–12 letters/digits)"}
+            - textarea:
+                id: spk_ta
+                align: TOP_LEFT
+                x: 4
+                y: 64
+                width: 220
+                height: 44
+                one_line: true
+                max_length: 12
+                accepted_chars: "abcdefghijklmnopqrstuvwxyz0123456789"
+                text_font: ui_22
+                placeholder_text: "e.g. mg"
+            - label: {align: TOP_LEFT, x: 244, y: 40, text_font: ui_18, text_color: "${c_muted}", text: "I am a"}
+            - dropdown:
+                id: type_dd
+                align: TOP_LEFT
+                x: 244
+                y: 64
+                width: 220
+                height: 44
+                symbol: "↓"
+                options: ["native speaker", "fluent speaker", "learner", "staff"]
+                dropdown_list: {text_font: ui_18, bg_color: "${c_panel}", text_color: "${c_ink}"}
+                on_value:
+                  - lambda: |-
+                      static const char *t[] = {"native", "fluent", "learner", "staff"};
+                      id(spk_type) = t[x];
+            - label:
+                align: TOP_LEFT
+                x: 4
+                y: 116
+                width: 460
+                long_mode: WRAP
+                text_font: ui_18
+                text_color: "${c_ink}"
+                text: "I confirm I am recording my own voice reading clinical phrases for the local medical interpreter project. I agree these recordings may be stored on the practice's own equipment and used to test and train its interpretation system. No patient information is involved. I can ask for my recordings to be deleted by quoting my speaker ID."
+            - checkbox:
+                id: consent_cb
+                align: TOP_LEFT
+                x: 4
+                y: 262
+                text: " I agree"
+                text_font: ui_22
+                text_color: "${c_ink}"
+                on_value:
+                  - lambda: 'id(consented) = x;'
+            - button:
+                align: BOTTOM_LEFT
+                x: 4
+                y: -4
+                width: 150
+                height: 52
+                widgets: [{label: {align: CENTER, text: "Cancel"}}]
+                on_click:
+                  - lambda: 'lv_obj_add_flag(id(vol_sheet), LV_OBJ_FLAG_HIDDEN);'
+            - button:
+                id: start_btn
+                align: BOTTOM_LEFT
+                x: 170
+                y: -4
+                width: 290
+                height: 52
+                bg_color: "${c_sage}"
+                widgets: [{label: {align: CENTER, text: "Continue", text_color: "${c_panel}"}}]
+                on_click:
+                  - lambda: |-
+                      std::string sid = lv_textarea_get_text(id(spk_ta));
+                      if (sid.size() < 2) { lv_textarea_set_placeholder_text(id(spk_ta), "initials?"); return; }
+                      if (!id(consented)) { lv_obj_set_style_text_color(id(consent_cb), lv_color_hex(0xA63D40), LV_PART_MAIN); return; }
+                      id(spk_id) = sid;
+                      lv_obj_add_flag(id(vol_sheet), LV_OBJ_FLAG_HIDDEN);
+                      if (id(want_rec) >= 0) id(set_mode).execute(true); else id(add_open).execute();
+            - keyboard:
+                id: kb
+                align: RIGHT_MID
+                x: 0
+                width: 300
+                height: 440
+                textarea: spk_ta
+                mode: TEXT_LOWER
 
 interval:
   - interval: 5s
@@ -879,6 +1003,7 @@ interval:
           if (id(need_images) && !id(polling)) { id(need_images) = false; id(fetch_images).execute(); return; }
           if (id(need_mic) && !id(polling)) { id(need_mic) = false; id(fetch_mic).execute(); return; }
           if (id(need_heard) && !id(polling)) { id(need_heard) = false; id(fetch_heard).execute(); return; }
+          if (id(need_langs) && !id(polling)) { id(need_langs) = false; id(add_langs).execute(); return; }
   - interval: 600ms
     then:
       - lambda: |-
@@ -943,9 +1068,12 @@ script:
                 bool ok = json::parse_json(body, [](JsonObject root) -> bool {
                   std::string copts = "All categories";
                   id(lang_codes).clear(); id(lang_names).clear();
+                  lang_scripts().clear();
                   for (JsonObject l : root["languages"].as<JsonArray>()) {
                     id(lang_codes).push_back(l["code"].as<std::string>());
                     id(lang_names).push_back(l["label"].as<std::string>());
+                    std::string sc = l["script"].is<const char *>() ? l["script"].as<std::string>() : "latin";
+                    lang_scripts()[l["code"].as<std::string>()] = sc == "arabic" ? 1 : sc == "image" ? -1 : 0;
                   }
                   id(cat_slugs).clear();
                   for (JsonObject c : root["categories"].as<JsonArray>()) {
@@ -1044,16 +1172,22 @@ script:
           sub = to ? "Step 2 of 2 — the patient's language  (you speak " + id(lang_names)[id(src_idx)] + ")"
                    : "Step 1 of 2 — the clinician's language";
           lv_label_set_text(id(lang_sub), sub.c_str());
+          const int pages = std::max(1, ((int) id(lang_names).size() + 19) / 20);
+          if (id(lang_page) >= pages) id(lang_page) = pages - 1;
+          if (id(lang_page) < 0) id(lang_page) = 0;
           for (int n = 0; n < 20; n++) {
-            if (n < (int) id(lang_names).size() && !(to && n == id(src_idx))) {   // never the same language twice
-              lv_label_set_text(lbls[n], id(lang_names)[n].c_str());
-              lv_obj_set_style_border_color(btns[n], lv_color_hex(lang_colour(id(lang_codes)[n])), LV_PART_MAIN);
+            const int i = id(lang_page) * 20 + n;
+            if (i < (int) id(lang_names).size() && !(to && i == id(src_idx))) {   // never the same language twice
+              lv_label_set_text(lbls[n], id(lang_names)[i].c_str());
+              lv_obj_set_style_border_color(btns[n], lv_color_hex(lang_colour(id(lang_codes)[i])), LV_PART_MAIN);
               lv_obj_set_style_border_width(btns[n], 4, LV_PART_MAIN);
               lv_obj_clear_flag(btns[n], LV_OBJ_FLAG_HIDDEN);
             } else {
               lv_obj_add_flag(btns[n], LV_OBJ_FLAG_HIDDEN);
             }
           }
+          if (id(lang_page) > 0) lv_obj_clear_flag(id(lp_prev), LV_OBJ_FLAG_HIDDEN); else lv_obj_add_flag(id(lp_prev), LV_OBJ_FLAG_HIDDEN);
+          if (id(lang_page) < pages - 1) lv_obj_clear_flag(id(lp_next), LV_OBJ_FLAG_HIDDEN); else lv_obj_add_flag(id(lp_next), LV_OBJ_FLAG_HIDDEN);
           lv_scr_load(id(page_lang)->obj);
 
   - id: pick_lang
@@ -1061,6 +1195,7 @@ script:
       n: int
     then:
       - lambda: |-
+          n += id(lang_page) * 20;
           if (n >= (int) id(lang_codes).size()) return;
           if (millis() - id(last_tap) < 500) return;          // one tap = one step
           id(last_tap) = millis();
@@ -1203,6 +1338,137 @@ script:
                 on_error:
                   - lambda: 'ESP_LOGW("repeat", "Nano not reachable");'
 
+  # ---- "Add phrase" page ---------------------------------------------------------------------
+  # Open it: categories from the last /phrases, then ask the Nano which languages could be added.
+  - id: add_open
+    then:
+      - lambda: |-
+          static std::string t; t = "Add to the phrasebook  ·  " + id(spk_id) + " (" + id(spk_type) + ")";
+          lv_label_set_text(id(add_title), t.c_str());
+          std::string copts; int sel = 0;
+          for (size_t i = 0; i < id(cat_slugs).size(); i++) {
+            if (!copts.empty()) copts += "\n";
+            copts += id(cat_slugs)[i];
+            if (id(cat_slugs)[i] == "intake") sel = i;
+          }
+          if (copts.empty()) copts = "intake";
+          lv_dropdown_set_options(id(add_cat)->obj, copts.c_str());
+          lv_dropdown_set_selected(id(add_cat)->obj, sel);
+          lv_textarea_set_text(id(add_ta), "");
+          lv_label_set_text(id(add_status), "");
+          id(add_file) = ""; id(add_recording) = false;
+          lv_label_set_text(id(add_mic_lbl), "●  Say it");
+          static std::string r; r = "Record translations in " + (id(dst_idx) >= 0 && id(dst_idx) < (int) id(lang_names).size() ? id(lang_names)[id(dst_idx)] : std::string("the patient's language")) + " →";
+          lv_label_set_text(id(add_rec_lbl), r.c_str());
+          lv_scr_load(id(page_add)->obj);
+      - script.execute: add_langs
+
+  # The "Add a language" dropdown: what the Nano could take on (also re-run after an add, via need_langs).
+  - id: add_langs
+    then:
+      - http_request.get:
+          url: !lambda return id(nano_base) + "/admin/languages";
+          capture_response: true
+          max_response_buffer_size: 4096
+          on_response:
+            - lambda: |-
+                std::string opts; id(add_lang_codes).clear();
+                json::parse_json(body, [&](JsonObject root) -> bool {
+                  for (JsonObject l : root["languages"].as<JsonArray>()) {
+                    if (!opts.empty()) opts += "\n";
+                    opts += l["label"].as<std::string>();
+                    if (!(l["font"] | true)) opts += " (font needed)";
+                    id(add_lang_codes).push_back(l["code"].as<std::string>());
+                  }
+                  return true;
+                });
+                lv_dropdown_set_options(id(add_lang_dd)->obj, opts.empty() ? "— every known language is in —" : opts.c_str());
+          on_error:
+            - lambda: 'lv_dropdown_set_options(id(add_lang_dd)->obj, "Nano not reachable");'
+
+  # ● starts a free English take on the Nano's mic; ■ stops it and puts Whisper's words in the box.
+  - id: add_mic_tap
+    then:
+      - lambda: |-
+          id(add_recording) = !id(add_recording);
+          lv_label_set_text(id(add_mic_lbl), id(add_recording) ? "■  Stop" : "●  Say it");
+          lv_label_set_text(id(add_status), id(add_recording) ? "Listening…" : "Transcribing…");
+      - http_request.post:
+          url: !lambda |-
+            return id(nano_base) + "/panel/" + std::string(id(add_recording) ? "record" : "stop") + "?lang=en&src=en&who=add";
+          capture_response: true
+          max_response_buffer_size: 1024
+          on_response:
+            - lambda: |-
+                if (id(add_recording)) { lv_label_set_text(id(add_status), "Listening — tap ■ when you have said it."); return; }
+                std::string text, file;
+                json::parse_json(body, [&](JsonObject root) -> bool {
+                  if (root["text"].is<const char *>()) text = root["text"].as<std::string>();
+                  if (root["file"].is<const char *>()) file = root["file"].as<std::string>();
+                  return true;
+                });
+                if (text.empty()) { lv_label_set_text(id(add_status), "Nothing heard — try again, a little closer to the mic."); return; }
+                lv_textarea_set_text(id(add_ta), text.c_str());
+                id(add_file) = file;
+                lv_label_set_text(id(add_status), "Check the words (tap the box to edit), then Save phrase.");
+          on_error:
+            - lambda: 'id(add_recording) = false; lv_label_set_text(id(add_mic_lbl), "●  Say it"); lv_label_set_text(id(add_status), "Nano not reachable");'
+
+  # Save: the words in the box become a phrase row on the Nano; the take (if any) is filed as its English recording.
+  - id: add_save_tap
+    then:
+      - if:
+          condition:
+            lambda: 'return strlen(lv_textarea_get_text(id(add_ta))) >= 3 && !id(add_recording);'
+          then:
+            - lambda: 'lv_label_set_text(id(add_status), "Saving…");'
+            - http_request.post:
+                url: !lambda |-
+                  const int ci = lv_dropdown_get_selected(id(add_cat)->obj);
+                  const std::string cat = ci < (int) id(cat_slugs).size() ? id(cat_slugs)[ci] : "intake";
+                  return id(nano_base) + "/panel/phrase?text=" + url_encode(lv_textarea_get_text(id(add_ta))) + "&category=" + cat
+                       + "&speaker=" + id(spk_id) + "&type=" + id(spk_type) + "&file=" + id(add_file);
+                capture_response: true
+                max_response_buffer_size: 1024
+                on_response:
+                  - lambda: |-
+                      std::string say = body.substr(0, 200);
+                      json::parse_json(body, [&](JsonObject root) -> bool {
+                        if (root["say"].is<const char *>()) say = root["say"].as<std::string>();
+                        return true;
+                      });
+                      lv_label_set_text(id(add_status), say.c_str());
+                      if (response->status_code == 200) { lv_textarea_set_text(id(add_ta), ""); id(add_file) = ""; id(need_load) = true; }
+                on_error:
+                  - lambda: 'lv_label_set_text(id(add_status), "Nano not reachable");'
+          else:
+            - lambda: 'lv_label_set_text(id(add_status), id(add_recording) ? "Tap ■ first." : "Say the phrase (or type it) before saving.");'
+
+  # Add the chosen language to the Nano's list; the wizard shows it after the reload.
+  - id: add_lang_tap
+    then:
+      - if:
+          condition:
+            lambda: 'return lv_dropdown_get_selected(id(add_lang_dd)->obj) < (int) id(add_lang_codes).size();'
+          then:
+            - lambda: 'lv_label_set_text(id(add_status), "Adding the language (fetching its font if needed)…");'
+            - http_request.post:
+                url: !lambda |-
+                  return id(nano_base) + "/panel/language?code=" + id(add_lang_codes)[lv_dropdown_get_selected(id(add_lang_dd)->obj)];
+                capture_response: true
+                max_response_buffer_size: 1024
+                on_response:
+                  - lambda: |-
+                      std::string say = body.substr(0, 200);
+                      json::parse_json(body, [&](JsonObject root) -> bool {
+                        if (root["say"].is<const char *>()) say = root["say"].as<std::string>();
+                        return true;
+                      });
+                      lv_label_set_text(id(add_status), say.c_str());
+                      if (response->status_code == 200) { id(need_load) = true; id(need_langs) = true; }
+                on_error:
+                  - lambda: 'lv_label_set_text(id(add_status), "Nano not reachable");'
+
   # Pull the Nano-rendered images for the patient page (only for scripts the panel can't draw).
   - id: fetch_images
     then:
@@ -1309,8 +1575,8 @@ script:
       - lambda: |-
           const bool on = enable;
           id(rec_mode) = on;
-          lv_label_set_text(id(mode_lbl), on ? "Recording as " : "Speak  ·  Record");
-          if (on) { static std::string t; t = "● Record mode · " + id(spk_id); lv_label_set_text(id(mode_lbl), t.c_str()); }
+          lv_label_set_text(id(mode_lbl), on ? "Recording as " : "+ Add phrase");
+          if (on) { static std::string t; t = "● " + id(spk_id) + " · done"; lv_label_set_text(id(mode_lbl), t.c_str()); }
           lv_obj_set_style_bg_color(id(mode_btn), lv_color_hex(on ? ${c_amber} : ${c_panel}), LV_PART_MAIN);
           lv_obj_set_style_text_color(id(mode_lbl), lv_color_hex(on ? ${c_panel} : ${c_ink}), LV_PART_MAIN);
           set_text_any(id(said_lbl), id(said_lbl_ar), std::string(on ? "Tap a phrase, read it aloud, tap it again (or Stop) to save." : "Tap a phrase to say it."));

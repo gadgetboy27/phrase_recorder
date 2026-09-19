@@ -36,6 +36,7 @@ Routes (JSON responses; the panel only reads the first ~60 chars of `say`):
 import hashlib
 import json
 import os
+import re
 import signal
 import socket
 import subprocess
@@ -61,6 +62,13 @@ import asr_worker  # noqa: E402  (deployed alongside; whisper-cli + llama helper
 import panel_takes  # noqa: E402
 import panel_drafts  # noqa: E402
 import panel_render  # noqa: E402
+import panel_admin  # noqa: E402
+
+# The language table lives in panel_admin; the other modules learn the extra codes/fonts from it.
+panel_drafts.NLLB_CODES.update(panel_admin.NLLB_CODES)
+panel_render.FONT_FOR.update({c: (panel_admin.font_path(c), 0) for c in panel_admin.LANGUAGES if panel_admin.font_path(c)})
+panel_render.RTL.update(panel_admin.RTL)
+asr_worker.WHISPER_UNSUPPORTED.setdefault("fj", "Fijian")
 
 HERE = Path(__file__).resolve().parent
 PHRASES = HERE / "phrases.json"
@@ -357,6 +365,8 @@ class Handler(BaseHTTPRequestHandler):
             png = panel_render.render_grid(cells, q.get("lang", "en"), int(q.get("w", 776)), int(q.get("h", 168)),
                                            fg=q.get("fg", "1B2621"), bg=q.get("bg", "F6F4EF"))
             return self.send_png(png)
+        if u.path == "/admin/languages":                # candidates for the panel's "Add a language"
+            return self.reply(200, {"languages": panel_admin.available()})
         if u.path == "/health":
             return self.reply(200, health())
         if u.path == "/phrases":
@@ -383,7 +393,7 @@ class Handler(BaseHTTPRequestHandler):
                     row["recording"] = True
                 return row
             return self.reply(200, {
-                "languages": d["languages"],
+                "languages": [dict(l, script=panel_admin.script(l["code"])) for l in d["languages"]],
                 "categories": d["categories"],
                 "drafts_pending": panel_drafts.pending(),
         "translator": "nllb" if panel_drafts.nllb_available() else ("qwen" if llama_up() else None),
@@ -415,6 +425,19 @@ class Handler(BaseHTTPRequestHandler):
                 panel_drafts.log_turn("patient", kind="preset", key=p["key"], sourceText=out["patient_text"],
                                       translatedText=out["say"], how=out["how"])
                 return self.reply(200, out)
+            if action == "phrase":                                    # "Add phrase" page: a new English phrase
+                speaker = {"id": q["speaker"].lower(), "type": q.get("type", "staff")} if q.get("speaker") else None
+                take = WORK / q["file"] if re.fullmatch(r"\d{8}T\d{6}Z_take\.wav", q.get("file", "")) else None
+                code, out = panel_admin.add_phrase(q.get("text"), q.get("category", ""), PHRASES, speaker, take)
+                if code == 200:
+                    log(f"phrase added from the panel: {out['key']} [{q.get('category')}] {q.get('text')!r}")
+                    panel_drafts.log_turn("system", kind="phrase_added", key=out["key"], sourceText=q.get("text"))
+                return self.reply(code, out)
+            if action == "language":                                  # "Add phrase" page: a new language
+                code, out = panel_admin.add_language(q.get("code", ""), PHRASES)
+                if code == 200:
+                    log(f"language added from the panel: {out['code']}")
+                return self.reply(code, out)
             if action == "shutdown":
                 log("shutdown requested by the panel")
                 self.reply(200, {"say": "Shutting down"})
