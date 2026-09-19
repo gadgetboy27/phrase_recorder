@@ -273,7 +273,21 @@ def _addresses():
     except OSError:
         pass
     ips = {i for i in ips if not i.startswith("172.17.")}        # docker bridge is not an address of ours
+    ips |= {f"172.20.10.{n}" for n in range(2, 15)}                # every address an iPhone hotspot can hand us
     return sorted(names), sorted(ips)
+
+
+def wifi():
+    """{"ssid": ..., "ip": ...} — the network the Nano itself is on (nmcli), for the clients' status lines."""
+    try:
+        out = subprocess.run(["nmcli", "-t", "-f", "ACTIVE,SSID", "dev", "wifi"], capture_output=True, text=True, timeout=3).stdout
+        ssid = next((l.split(":", 1)[1] for l in out.splitlines() if l.startswith("yes:")), None)
+    except (OSError, subprocess.TimeoutExpired):
+        ssid = None
+    ip = next((i for i in _addresses()[1] if not i.startswith(("127.", "172.20.10.")) and i != "10.42.0.1"), None)
+    if ssid == "PhraseKit":
+        ip = "10.42.0.1"
+    return {"ssid": ssid, "ip": ip}
 
 
 def tls_ensure():

@@ -423,6 +423,7 @@ def health():
         "translator": "nllb" if panel_drafts.nllb_available() else ("qwen" if llama_up() else None),
         "recording": audio.recording,
         "phrases": len(load_phrases()[0]),
+        "wifi": panel_admin.wifi(),                    # which network the Nano is on, and its address there
     }
 
 

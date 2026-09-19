@@ -72,7 +72,8 @@ panel() {
   fi
   ssh "$NANO_SSH" '
     if systemctl list-unit-files phrase-panel.service >/dev/null 2>&1 && [ -f /etc/systemd/system/phrase-panel.service ]; then
-      sudo -n systemctl restart phrase-panel 2>/dev/null || systemctl restart phrase-panel 2>/dev/null || { echo "restart needs: tools/nano.sh install (once)"; }
+      # no root needed: the unit has Restart=always, so ending the process is a restart
+      kill "$(systemctl show -p MainPID --value phrase-panel)" 2>/dev/null; sleep 4
     else                                   # not installed as a service yet (tools/nano.sh install): the old way
       (crontab -l 2>/dev/null | grep -v -e panel_api.py -e llama-server
        echo "@reboot sleep 15 && python3 \$HOME/panel/panel_api.py >>\$HOME/panel/panel.log 2>&1"

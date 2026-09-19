@@ -613,7 +613,8 @@
     try {
       const r = await fetch("/health", { headers: { Authorization: "Bearer " + S.token } }); const h = await r.json();
       const s = $("status"); s.classList.remove("bad");
-      s.textContent = "Nano ✓  ·  speech " + (h.whisper && h.piper ? "✓" : "✗") + "  ·  translator " + (h.translator ? "✓ " + h.translator : "starting…") + "  ·  db " + (h.db ? "✓" : "✗") + "  ·  " + location.host;
+      const w = h.wifi || {};
+      s.textContent = "Nano on " + (w.ssid || "wired") + (w.ip ? " · " + w.ip : "") + "  ·  speech " + (h.whisper && h.piper ? "✓" : "✗") + "  ·  translator " + (h.translator ? "✓ " + h.translator : "starting…") + "  ·  db " + (h.db ? "✓" : "✗") + "  ·  this iPad → " + location.host;
     } catch (e) { const s = $("status"); s.textContent = "Nano not reachable at " + location.host + " — same Wi-Fi?"; s.classList.add("bad"); }
   }
   setInterval(health, 10000); health();
