@@ -510,6 +510,8 @@ class Handler(BaseHTTPRequestHandler):
             return self.reply(200, {"languages": panel_admin.available()})
         if u.path == "/health":
             return self.reply(200, health())
+        if u.path == "/admin/wifi":                     # the Wi-Fi picker: networks the Nano knows
+            return self.reply(200, {"networks": panel_admin.wifi_networks(), "current": panel_admin.wifi()})
         if u.path == "/devices":                        # paired devices (names only)
             return self.reply(200, {"devices": [dict(v, token=t[:6] + "…") for t, v in panel_admin.devices().items()]})
         if u.path == "/phrases":
@@ -594,6 +596,11 @@ class Handler(BaseHTTPRequestHandler):
                 code, out = panel_admin.add_language(q.get("code", ""), PHRASES)
                 if code == 200:
                     log(f"language added from the panel: {out['code']}")
+                return self.reply(code, out)
+            if action == "wifi":                                      # move the Nano to another known network
+                code, out = panel_admin.wifi_request(q.get("ssid", ""))
+                if code == 200:
+                    log(f"wifi switch requested: {out['ssid']}")
                 return self.reply(code, out)
             if action == "shutdown":
                 log("shutdown requested by the panel")

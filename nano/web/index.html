@@ -187,6 +187,9 @@
       <button class="primary" style="background:var(--amber)" id="addRec">Record translations →</button>
       <h3>Session</h3>
       <div class="muted small" id="whoami"></div>
+      <h3>Wi-Fi — move the Nano to another network it knows</h3>
+      <div class="row"><select id="wifiSel" class="grow"><option>loading…</option></select><button class="primary" style="background:var(--steel)" id="wifiBtn">Move</button></div>
+      <div class="muted small">After it moves, join the same Wi-Fi on this iPad and open <code>https://gadgetboy-nano.local:8766/</code> (PhraseKit hotspot: <code>https://10.42.0.1:8766/</code>).</div>
       <div class="row"><button class="secondary" id="unpair">Forget this pairing</button><button class="warn" id="shutdown">Shut down the Nano</button></div>
       <div class="muted small">Setup for another iPad: <code id="setupUrl"></code></div>
     </div>
@@ -563,6 +566,10 @@
     $("setupUrl").textContent = location.origin + "/setup";
     show("add");
     try {
+      const w = await api("/admin/wifi"); const ws = $("wifiSel"); ws.innerHTML = "";
+      for (const n of w.networks) { const o = document.createElement("option"); o.value = n.ssid; o.textContent = n.ssid + (n.active ? "  ● Nano is here" : n.signal != null ? "  · in sight " + n.signal + "%" : "  · not in sight"); if (n.active) o.selected = true; ws.appendChild(o); }
+    } catch (e) { $("wifiSel").innerHTML = "<option value=''>" + esc(e.message) + "</option>"; }
+    try {
       const r = await api("/admin/languages"); const s = $("addLang"); s.innerHTML = "";
       for (const l of r.languages) { const o = document.createElement("option"); o.value = l.code; o.textContent = l.label + (l.font ? "" : " (font will download)"); s.appendChild(o); }
       if (!r.languages.length) s.innerHTML = "<option value=''>— every known language is in —</option>";
@@ -600,6 +607,12 @@
     catch (e) { $("addStatus").textContent = e.message; }
   };
   $("addRec").onclick = () => { setMode(true); show("main"); };
+  let wifiArmed = 0;
+  $("wifiBtn").onclick = async () => {
+    const ssid = $("wifiSel").value; if (!ssid) return;
+    if (Date.now() - wifiArmed > 5000) { wifiArmed = Date.now(); $("wifiBtn").textContent = "Tap again to move"; setTimeout(() => { $("wifiBtn").textContent = "Move"; }, 5000); return; }
+    try { const r = await post("/panel/wifi", { ssid }); alertStatus(r.say); } catch (e) { alertStatus(e.message); }
+  };
   $("unpair").onclick = () => { try { localStorage.removeItem("pk_token"); } catch (e) {} location.replace("/setup"); };
   let armed = 0;
   $("shutdown").onclick = async () => {

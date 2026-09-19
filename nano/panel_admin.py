@@ -277,6 +277,34 @@ def _addresses():
     return sorted(names), sorted(ips)
 
 
+def wifi_networks():
+    """The Wi-Fi networks the Nano knows (NetworkManager profiles), with signal when in sight and which is
+    active — what the clients' Wi-Fi picker offers. Only known networks: the panel has no keyboard for keys."""
+    try:
+        known = [l.split(":")[0] for l in subprocess.run(["nmcli", "-t", "-f", "NAME,TYPE", "con", "show"], capture_output=True, text=True, timeout=5).stdout.splitlines()
+                 if l.endswith(":802-11-wireless")]
+        seen = {}
+        for l in subprocess.run(["nmcli", "-t", "-f", "ACTIVE,SSID,SIGNAL", "dev", "wifi", "list", "--rescan", "no"], capture_output=True, text=True, timeout=5).stdout.splitlines():
+            parts = l.split(":")
+            if len(parts) >= 3 and parts[1]:
+                seen[parts[1]] = max(seen.get(parts[1], 0), int(parts[2] or 0))
+        active = wifi()["ssid"]
+    except (OSError, subprocess.TimeoutExpired, ValueError):
+        return []
+    return [{"ssid": n, "signal": seen.get(n), "active": n == active, "hotspot": n == "PhraseKit"} for n in known]
+
+
+def wifi_request(ssid):
+    """Ask root (phrase-panel-wifi.path) to switch. Returns (status, reply)."""
+    runtime = Path("/run/phrase-panel")
+    if ssid not in [n["ssid"] for n in wifi_networks()]:
+        return 400, {"say": f"{ssid!r} is not a network the Nano knows"}
+    if not runtime.is_dir():
+        return 503, {"say": "Wi-Fi switching needs tools/nano.sh install (root helper missing)"}
+    (runtime / "wifi").write_text(ssid)
+    return 200, {"say": f"Switching the Nano to {ssid} — join it on this device, then open the app again", "ssid": ssid}
+
+
 def wifi():
     """{"ssid": ..., "ip": ...} — the network the Nano itself is on (nmcli), for the clients' status lines."""
     try:
@@ -284,9 +312,11 @@ def wifi():
         ssid = next((l.split(":", 1)[1] for l in out.splitlines() if l.startswith("yes:")), None)
     except (OSError, subprocess.TimeoutExpired):
         ssid = None
-    ip = next((i for i in _addresses()[1] if not i.startswith(("127.", "172.20.10.")) and i != "10.42.0.1"), None)
-    if ssid == "PhraseKit":
-        ip = "10.42.0.1"
+    try:                                                              # the real interface addresses, not the cert's SAN list
+        real = [i for i in subprocess.run(["hostname", "-I"], capture_output=True, text=True, timeout=3).stdout.split() if not i.startswith("172.17.")]
+    except OSError:
+        real = []
+    ip = "10.42.0.1" if ssid == "PhraseKit" else (real[0] if real else None)
     return {"ssid": ssid, "ip": ip}
 
 

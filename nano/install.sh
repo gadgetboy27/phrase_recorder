@@ -8,6 +8,8 @@
 #   llama-server.service        Qwen fallback translator, same treatment.
 #   phrase-panel-shutdown.path  the API can't sudo any more, so it touches /run/phrase-panel/shutdown and
 #                               this root unit powers the Nano off.
+#   phrase-panel-wifi.path      the API writes an SSID to /run/phrase-panel/wifi; root switches networks
+#                               (falls back to the previous one if the new one fails).
 #   phrasekit-internet          on|off|status — nftables rule that blocks every route to the internet
 #                               (from the Nano and from anything on its hotspot) while a consult runs.
 #                               `off` at a demo, `on` at home for fonts/Google-voice caching. Passwordless
@@ -89,6 +91,44 @@ Type=oneshot
 ExecStart=/bin/sh -c 'rm -f /run/phrase-panel/shutdown; /usr/bin/systemctl poweroff'
 EOF
 
+# The API (sandboxed, no sudo) writes an SSID to /run/phrase-panel/wifi; this root unit switches to it.
+# If the new network is not up within 40 s the previous one is restored, so a bad pick cannot strand the Nano.
+cat > /usr/local/sbin/phrasekit-wifi <<'EOF'
+#!/bin/bash
+req=/run/phrase-panel/wifi
+[ -f "$req" ] || exit 0
+ssid=$(head -c 64 "$req"); rm -f "$req"
+prev=$(nmcli -t -f ACTIVE,SSID dev wifi list --rescan no | awk -F: '$1=="yes"{print $2; exit}')
+[ -n "$ssid" ] && [ "$ssid" != "$prev" ] || exit 0
+logger -t phrasekit-wifi "switching from '$prev' to '$ssid'"
+nmcli dev wifi rescan >/dev/null 2>&1; sleep 4
+if nmcli --wait 40 con up "$ssid" >/dev/null 2>&1; then
+  logger -t phrasekit-wifi "on '$ssid' ($(hostname -I | cut -d' ' -f1))"
+else
+  logger -t phrasekit-wifi "'$ssid' did not come up - back to '$prev'"
+  [ -n "$prev" ] && nmcli --wait 40 con up "$prev" >/dev/null 2>&1
+fi
+EOF
+chmod 755 /usr/local/sbin/phrasekit-wifi
+cat > /etc/systemd/system/phrase-panel-wifi.path <<'EOF'
+[Unit]
+Description=Switch Wi-Fi when the panel API asks (writes /run/phrase-panel/wifi)
+
+[Path]
+PathExists=/run/phrase-panel/wifi
+
+[Install]
+WantedBy=multi-user.target
+EOF
+cat > /etc/systemd/system/phrase-panel-wifi.service <<'EOF'
+[Unit]
+Description=Wi-Fi switch requested by the panel
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/phrasekit-wifi
+EOF
+
 cat > /usr/local/sbin/phrasekit-internet <<'EOF'
 #!/bin/sh
 # phrasekit-internet on|off|status — off = nothing on the Nano, and nothing on its hotspot, can reach
@@ -145,8 +185,8 @@ systemctl daemon-reload
 pkill -u "$PANEL_USER" -f "^python3 .*panel_api.py" || true
 pkill -u "$PANEL_USER" -x llama-server || true
 sleep 2
-systemctl enable --now phrase-panel-shutdown.path llama-server.service phrase-panel.service
+systemctl enable --now phrase-panel-shutdown.path phrase-panel-wifi.path llama-server.service phrase-panel.service
 systemctl restart llama-server.service phrase-panel.service
 sleep 4
 systemctl --no-pager --lines=0 status phrase-panel.service | sed -n 1,3p
-echo "done — services: $(systemctl is-active phrase-panel llama-server phrase-panel-shutdown.path | tr '\n' ' ')"
+echo "done — services: $(systemctl is-active phrase-panel llama-server phrase-panel-shutdown.path phrase-panel-wifi.path | tr '\n' ' ')"
