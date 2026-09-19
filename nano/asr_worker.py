@@ -22,7 +22,6 @@ Result (JSON on stdout): {"files": [...per file...], "translations": [...], "tim
 Progress goes to stderr. Stdlib only — nothing to install on the Nano.
 """
 import json
-import os
 import re
 import subprocess
 import sys

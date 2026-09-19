@@ -1032,14 +1032,15 @@ script:
           on_response:
             - lambda: |-
                 id(polling) = false;
-                bool whisper = false, piper = false, llama = false, db = false;
+                bool whisper = false, piper = false, translator = false, db = false;
                 json::parse_json(body, [&](JsonObject r) -> bool {
-                  whisper = r["whisper"] | false; piper = r["piper"] | false; llama = r["llama"] | false; db = r["db"] | false;
+                  whisper = r["whisper"] | false; piper = r["piper"] | false; db = r["db"] | false;
+                  translator = r["translator"].is<const char *>();      // "nllb" or "qwen"; null while neither is up
                   return true;
                 });
                 static std::string st;
                 st = "Wi-Fi: " + std::string([]{ std::array<char, wifi::SSID_BUFFER_SIZE> b; return std::string(wifi::global_wifi_component->wifi_ssid_to(b)); }()) + " ✓  ·  Nano ✓  ·  speech " + (whisper && piper ? "✓" : "✗")
-                   + "  ·  translator " + (llama ? "✓" : "starting…") + "  ·  db " + (db ? "✓" : "✗");
+                   + "  ·  translator " + (translator ? "✓" : "starting…") + "  ·  db " + (db ? "✓" : "✗");
                 lv_label_set_text(id(status_lbl), st.c_str());
                 bool first = !id(nano_ok);
                 id(nano_ok) = true;

@@ -35,7 +35,6 @@ Routes (JSON responses; the panel only reads the first ~60 chars of `say`):
 """
 import hashlib
 import json
-import os
 import re
 import signal
 import socket
@@ -189,6 +188,10 @@ class Audio:
         with self.lock:
             self._stop_recorder()
             WORK.mkdir(parents=True, exist_ok=True)
+            cutoff = time.time() - 3600                    # free takes are transient: drop yesterday's, keep the
+            for old in WORK.glob("*_take.wav"):            # one "Add phrase" may still be about to file
+                if old.stat().st_mtime < cutoff:
+                    old.unlink(missing_ok=True)
             self.take_meta = dict(meta or {}, started_at_ms=int(time.time() * 1000))
             self.take = WORK / time.strftime("%Y%m%dT%H%M%SZ_take.wav", time.gmtime())
             self.recorder = subprocess.Popen(
@@ -496,7 +499,7 @@ class Handler(BaseHTTPRequestHandler):
                     panel_drafts.log_turn("patient" if q.get("who") == "patient" else "clinician", kind="speech",
                                           sourceText=text, translatedText=out.get("translated"))
                 elif text and lang != src:
-                    out["say"] = f"{text}  (llama-server is off — no translation)"
+                    out["say"] = f"{text}  (no translator running — NLLB missing and llama-server off)"
                 return self.reply(200, out)
             phrases, names = load_phrases()
             p = phrases.get(action)
