@@ -95,13 +95,28 @@ cat > /usr/local/sbin/phrasekit-internet <<'EOF'
 # and SSH keep working. Not persisted: a reboot comes up with the internet allowed.
 case "$1" in
   off)
-    nft -f - <<'NFT'
+    nft -f - <<'NFT' || { echo "internet: rule failed to load — still ON"; exit 1; }
 table inet phrasekit
 delete table inet phrasekit
 table inet phrasekit {
-  set lan4 { type ipv4_addr; flags interval; elements = { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 127.0.0.0/8, 169.254.0.0/16, 224.0.0.0/4 } }
-  chain output  { type filter hook output  priority 0; policy accept; oifname "lo" accept; ip daddr @lan4 accept; ip6 daddr { ::1, fe80::/10, ff00::/8 } accept; reject with icmpx type admin-prohibited }
-  chain forward { type filter hook forward priority 0; policy accept; ip daddr @lan4 accept; ip6 daddr { fe80::/10, ff00::/8 } accept; reject with icmpx type admin-prohibited }
+  set lan4 {
+    type ipv4_addr
+    flags interval
+    elements = { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 127.0.0.0/8, 169.254.0.0/16, 224.0.0.0/4 }
+  }
+  chain output {
+    type filter hook output priority 0; policy accept;
+    oifname "lo" accept
+    ip daddr @lan4 accept
+    ip6 daddr { ::1, fe80::/10, ff00::/8 } accept
+    drop
+  }
+  chain forward {
+    type filter hook forward priority 0; policy accept;
+    ip daddr @lan4 accept
+    ip6 daddr { fe80::/10, ff00::/8 } accept
+    drop
+  }
 }
 NFT
     echo "internet: OFF (LAN and hotspot only)" ;;
@@ -125,7 +140,12 @@ visudo -c -f /etc/sudoers.d/phrasekit >/dev/null
 crontab -u "$PANEL_USER" -l 2>/dev/null | grep -v -e panel_api.py -e llama-server | crontab -u "$PANEL_USER" - || true
 
 systemctl daemon-reload
+# whatever cron/setsid started before the units existed holds :8765 / :8080 — the units replace it
+pkill -u "$PANEL_USER" -f "^python3 .*panel_api.py" || true
+pkill -u "$PANEL_USER" -x llama-server || true
+sleep 2
 systemctl enable --now phrase-panel-shutdown.path llama-server.service phrase-panel.service
+systemctl restart llama-server.service phrase-panel.service
 sleep 4
 systemctl --no-pager --lines=0 status phrase-panel.service | sed -n 1,3p
 echo "done — services: $(systemctl is-active phrase-panel llama-server phrase-panel-shutdown.path | tr '\n' ' ')"
