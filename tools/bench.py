@@ -4,7 +4,8 @@
     tools/bench.py                      # every approved golden_set row that has recordings
     tools/bench.py --lang mi            # one language
     tools/bench.py --no-translate       # ASR only (skip the LLM)
-    tools/bench.py --model ggml-base.en.bin --force   # another Whisper model; re-trim derived files
+    tools/bench.py --model ggml-medium.bin --force    # another Whisper model (fetch it first with
+                                                     # ~/whisper.cpp/models/download-ggml-model.sh); re-trim derived files
 
 What it does, per approved translation:
   ASR   each linked recording is trimmed to its speech (Silero VAD) and resampled to
