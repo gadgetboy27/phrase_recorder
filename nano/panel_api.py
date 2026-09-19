@@ -293,8 +293,9 @@ def speak_phrase(p, lang, names, client=False):
     English with a spoken warning. Returns the panel's reply dict; with client=True it carries
     "audio": [urls] for the client to play in order instead of the Nano playing them."""
     out = _speak_phrase(p, lang, names, client)
+    wavs = out.pop("_wavs", None) or []
     if client:
-        out["audio"] = [serve_audio(w) for w in (out.pop("_wavs", None) or [])]
+        out["audio"] = [serve_audio(w) for w in wavs]
     return out
 
 

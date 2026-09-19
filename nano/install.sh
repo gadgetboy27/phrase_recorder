@@ -16,6 +16,7 @@ set -euo pipefail
 [ "$(id -u)" = 0 ] || { echo "run with sudo"; exit 1; }
 PANEL_USER="${SUDO_USER:-gadgetboy}"
 HOME_DIR=$(getent passwd "$PANEL_USER" | cut -d: -f6)
+mkdir -p "$HOME_DIR/.config/pulse" && chown "$PANEL_USER" "$HOME_DIR/.config/pulse"   # libpulse (loaded by aplay) wants a scratch dir
 
 cat > /etc/systemd/system/phrase-panel.service <<EOF
 [Unit]
@@ -35,7 +36,7 @@ StandardError=append:$HOME_DIR/panel/panel.log
 RuntimeDirectory=phrase-panel
 ProtectSystem=strict
 ProtectHome=read-only
-ReadWritePaths=$HOME_DIR/panel $HOME_DIR/phrase-recordings
+ReadWritePaths=$HOME_DIR/panel $HOME_DIR/phrase-recordings $HOME_DIR/.config/pulse
 PrivateTmp=yes
 NoNewPrivileges=yes
 ProtectKernelTunables=yes
