@@ -10,9 +10,16 @@
                   tools/nano.sh panel (export before copy) — Postgres stays the source of truth.
 
     python3 panel_admin.py fonts     # fetch every font the language table needs (tools/nano.sh fonts)
+    python3 panel_admin.py pair      # print a pairing code for an iPad (tools/nano.sh pair)
+    python3 panel_admin.py devices   # list paired devices;  revoke <name|token-prefix>
+    python3 panel_admin.py tls       # (re)issue the Nano's CA + server certificate (nano.sh panel does this)
 """
 import calendar
+import json
 import re
+import secrets
+import socket
+import subprocess
 import sys
 import time
 import urllib.request
@@ -147,7 +154,7 @@ def add_language(code, phrases_path):
     return 200, {"say": f"{LANGUAGES[code][0]} added — it is on the language screens now", "code": code}
 
 
-def add_phrase(text, category, phrases_path, speaker=None, take=None):
+def add_phrase(text, category, phrases_path, speaker=None, take=None, device=panel_takes.PANEL_DEVICE):
     """INSERT the phrase (tools/add_phrase.py's rules), file the take if given, refresh the JSON.
     Returns (http status, reply dict)."""
     text = re.sub(r"\s+", " ", (text or "")).strip()
@@ -170,7 +177,7 @@ def add_phrase(text, category, phrases_path, speaker=None, take=None):
         started = calendar.timegm(time.strptime(m.group(0), "%Y%m%dT%H%M%SZ")) * 1000 if m else int(time.time() * 1000)
         phrase = {"key": key, "version": 1, "category": category, "text": text}
         try:
-            batch_id, rec = panel_takes.file_take(Path(take), started, "en", speaker, phrase, text, "canonical")   # an English session
+            batch_id, rec = panel_takes.file_take(Path(take), started, "en", speaker, phrase, text, "canonical", device)   # an English session
             out["file"], out["batch"] = rec["file"], batch_id
             out["say"] += f" — your recording is take {rec['take']}"
         except Exception as e:                           # the phrase is in; a lost take is not worth a 500
@@ -185,8 +192,137 @@ def refresh(phrases_path):
     Path(phrases_path).write_text(export_phrases.render(export_phrases.fetch(DSN)))
 
 
+# ---- devices: who may talk to the API ---------------------------------------------------------
+# devices.json: {token: {"name": "...", "kind": "panel"|"ipad", "added": iso}}. Every request except the
+# public ones (health, setup page, CA cert, audio/render fetches, pairing) must carry a token.
+DEVICES = Path.home() / "panel" / "devices.json"
+PAIR = Path.home() / "panel" / "pair.json"
+PAIR_TTL = 600            # a pairing code lives ten minutes
+
+
+def _load(path):
+    try:
+        return json.loads(path.read_text())
+    except (OSError, ValueError):
+        return {}
+
+
+def _save(path, obj):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(".tmp")
+    tmp.write_text(json.dumps(obj, indent=2))
+    tmp.chmod(0o600)
+    tmp.replace(path)
+
+
+def devices():
+    return _load(DEVICES)
+
+
+def token_ok(token):
+    return bool(token) and token in devices()
+
+
+def ensure_device(token, name, kind):
+    """Register a fixed token (the Waveshare's, from nano/secrets.yaml) without duplicating it."""
+    d = devices()
+    if token not in d:
+        d[token] = {"name": name, "kind": kind, "added": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
+        _save(DEVICES, d)
+
+
+def new_pair_code():
+    code = f"{secrets.randbelow(10**6):06d}"
+    _save(PAIR, {"code": code, "expires": time.time() + PAIR_TTL})
+    return code
+
+
+def redeem_pair_code(code, name):
+    """The setup page sends the code the operator read out; a fresh token comes back, or None."""
+    p = _load(PAIR)
+    if not p or time.time() > p.get("expires", 0) or not code or not secrets.compare_digest(str(code), str(p.get("code"))):
+        return None
+    PAIR.unlink(missing_ok=True)                                  # one code, one device
+    token = secrets.token_urlsafe(32)
+    d = devices()
+    d[token] = {"name": (name or "iPad")[:40], "kind": "ipad", "added": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
+    _save(DEVICES, d)
+    return token
+
+
+def revoke(name_or_prefix):
+    d = devices()
+    gone = [t for t, v in d.items() if v["name"] == name_or_prefix or t.startswith(name_or_prefix)]
+    for t in gone:
+        del d[t]
+    _save(DEVICES, d)
+    return len(gone)
+
+
+# ---- TLS: the Nano is its own certificate authority ----------------------------------------------
+# iPads trust ca.crt once (GET /ca.crt → install profile → Certificate Trust Settings); the server cert
+# carries every address the Nano answers on, and is re-issued when that set changes.
+TLS = Path.home() / "panel" / "tls"
+
+
+def _addresses():
+    names = {"phrasekit.local", socket.gethostname() + ".local", socket.gethostname()}
+    ips = {"10.42.0.1", "127.0.0.1"}
+    try:
+        ips |= set(subprocess.run(["hostname", "-I"], capture_output=True, text=True).stdout.split())
+    except OSError:
+        pass
+    ips = {i for i in ips if not i.startswith("172.17.")}        # docker bridge is not an address of ours
+    return sorted(names), sorted(ips)
+
+
+def tls_ensure():
+    """Create the CA once; (re)issue the server certificate whenever the address set changed.
+    Returns (cert_path, key_path) or None if openssl is unavailable."""
+    TLS.mkdir(parents=True, exist_ok=True)
+    ca_key, ca_crt = TLS / "ca.key", TLS / "ca.crt"
+    srv_key, srv_crt, san_file = TLS / "server.key", TLS / "server.crt", TLS / "server.san"
+    names, ips = _addresses()
+    san = ",".join([f"DNS:{n}" for n in names] + [f"IP:{i}" for i in ips])
+    try:
+        if not ca_crt.exists():
+            subprocess.run(["openssl", "req", "-x509", "-newkey", "rsa:3072", "-nodes", "-days", "3650", "-sha256",
+                            "-subj", "/CN=PhraseKit Nano CA/O=PhraseKit", "-keyout", str(ca_key), "-out", str(ca_crt),
+                            "-addext", "basicConstraints=critical,CA:TRUE", "-addext", "keyUsage=critical,keyCertSign,cRLSign"],
+                           check=True, capture_output=True)
+            ca_key.chmod(0o600)
+        if not srv_crt.exists() or not san_file.exists() or san_file.read_text() != san:
+            csr = TLS / "server.csr"
+            subprocess.run(["openssl", "req", "-new", "-newkey", "rsa:2048", "-nodes", "-subj", "/CN=phrasekit.local/O=PhraseKit",
+                            "-keyout", str(srv_key), "-out", str(csr)], check=True, capture_output=True)
+            ext = TLS / "server.ext"
+            ext.write_text(f"subjectAltName={san}\nextendedKeyUsage=serverAuth\nkeyUsage=digitalSignature,keyEncipherment\n")
+            subprocess.run(["openssl", "x509", "-req", "-in", str(csr), "-CA", str(ca_crt), "-CAkey", str(ca_key), "-CAcreateserial",
+                            "-out", str(srv_crt), "-days", "825", "-sha256", "-extfile", str(ext)], check=True, capture_output=True)
+            srv_key.chmod(0o600)
+            san_file.write_text(san)
+            csr.unlink(missing_ok=True)
+            print("tls: server certificate issued for", san, file=sys.stderr, flush=True)
+        return srv_crt, srv_key
+    except (OSError, subprocess.CalledProcessError) as e:
+        print("tls: openssl failed:", repr(e), file=sys.stderr, flush=True)
+        return None
+
+
 if __name__ == "__main__":
-    if sys.argv[1:] == ["fonts"]:
+    if sys.argv[1:2] == ["pair"]:
+        names, ips = _addresses()
+        print(f"pairing code {new_pair_code()} (valid {PAIR_TTL // 60} min)")
+        print("on the iPad open  https://" + (ips[-1] if ips else "10.42.0.1") + ":8766/setup")
+    elif sys.argv[1:2] == ["devices"]:
+        for t, v in devices().items():
+            print(f"{t[:8]}…  {v['kind']:5s} {v['name']:20s} added {v['added']}")
+    elif sys.argv[1:2] == ["revoke"] and len(sys.argv) > 2:
+        print(f"revoked {revoke(sys.argv[2])} device(s)")
+    elif sys.argv[1:2] == ["tls"]:
+        r = tls_ensure()
+        print("tls:", "ok " + str(r[0]) if r else "FAILED")
+    elif sys.argv[1:] == ["fonts"]:
         for c in LANGUAGES:
             p = font_path(c)
             if p is not None:

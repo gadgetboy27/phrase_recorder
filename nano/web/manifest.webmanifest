@@ -1,0 +1,15 @@
+{
+  "name": "PhraseKit",
+  "short_name": "PhraseKit",
+  "description": "Clinician–patient phrase interpreter, served by the PhraseKit Nano on the local network.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "landscape",
+  "background_color": "#F6F4EF",
+  "theme_color": "#4A7A68",
+  "icons": [
+    {"src": "/icon-192.png", "sizes": "192x192", "type": "image/png"},
+    {"src": "/icon-512.png", "sizes": "512x512", "type": "image/png"}
+  ]
+}

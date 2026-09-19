@@ -1,0 +1,632 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="PhraseKit">
+<meta name="theme-color" content="#4A7A68">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/icon-192.png">
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
+<title>PhraseKit</title>
+<style>
+  /* Same palette as the Waveshare panel (docs/project-brief.md §10): clinician = sage, patient = steel, drafts = amber. */
+  :root { --base:#F6F4EF; --panel:#FFFFFF; --ink:#1B2621; --muted:#6B7F9E; --sage:#4A7A68; --steel:#6B7F9E; --amber:#B8843C; --brick:#A63D40; --line:#DDD8CE; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html, body { height:100%; margin:0; background:var(--base); color:var(--ink); font:18px/1.35 -apple-system, "Inter", system-ui, sans-serif; overflow:hidden; }
+  body { display:flex; flex-direction:column; padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+  button { font:inherit; color:inherit; border:0; background:var(--panel); border-radius:14px; padding:12px 16px; cursor:pointer; touch-action:manipulation; }
+  button:active { filter:brightness(.94); }
+  button:disabled { opacity:.45; }
+  select, textarea, input { font:inherit; color:inherit; border:1px solid var(--line); border-radius:12px; background:var(--panel); padding:10px 12px; }
+  .hidden { display:none !important; }
+  .muted { color:var(--muted); } .amber { color:var(--amber); } .small { font-size:15px; }
+
+  /* ---- header ---- */
+  header { display:flex; align-items:center; gap:10px; padding:10px 14px; background:var(--base); flex:0 0 auto; }
+  .chip { padding:10px 16px; border-radius:12px; color:#fff; font-weight:600; background:var(--steel); min-width:110px; text-align:center; }
+  .chip.on { outline:3px solid currentColor; outline-offset:3px; }
+  header .arrow { color:var(--muted); font-size:22px; }
+  header .spacer { flex:1; }
+  #cat { max-width:220px; }
+  #mode { background:var(--panel); border:1px solid var(--line); font-weight:600; }
+  #mode.rec { background:var(--amber); color:#fff; border-color:var(--amber); }
+  #status { position:fixed; left:0; right:0; bottom:0; padding:4px 14px; font-size:13px; color:var(--muted); background:var(--base); text-align:center; }
+  #status.bad { color:#fff; background:var(--brick); }
+
+  /* ---- screens ---- */
+  section.screen { flex:1 1 auto; display:flex; flex-direction:column; padding:6px 14px 30px; overflow:hidden; min-height:0; }
+  .title { font-size:28px; font-weight:700; margin:6px 0 2px; }
+  .sub { color:var(--muted); margin-bottom:12px; }
+  .langs { display:grid; grid-template-columns:repeat(auto-fill, minmax(150px, 1fr)); gap:10px; overflow:auto; padding-bottom:12px; }
+  .langs button { border:4px solid var(--steel); padding:18px 10px; font-size:19px; font-weight:600; min-height:78px; }
+  .row { display:flex; gap:10px; align-items:center; }
+  .grow { flex:1; }
+
+  /* main: phrase grid + conversation row */
+  #grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(210px, 1fr)); gap:10px; overflow:auto; flex:1; align-content:start; padding-bottom:6px; }
+  .card { position:relative; border:2px solid var(--sage); min-height:104px; text-align:center; padding:22px 12px 12px; font-size:19px; line-height:1.25; }
+  .card .key { position:absolute; left:10px; top:6px; font-size:13px; color:var(--muted); }
+  .card .rec { position:absolute; right:10px; top:6px; font-size:13px; color:var(--sage); }
+  .card.used { color:#fff; }
+  .card .src { display:block; margin-top:6px; font-size:14px; color:var(--muted); }
+  .card.used .src { color:rgba(255,255,255,.85); }
+  .convo { display:flex; gap:10px; margin-top:10px; flex:0 0 auto; }
+  .box { flex:1; background:var(--panel); border:2px solid var(--line); border-radius:14px; padding:10px 12px; min-height:96px; }
+  .box .who { font-weight:600; font-size:15px; margin-bottom:4px; }
+  .box.said { border-color:var(--sage); } .box.said .who { color:var(--sage); }
+  .box.heard { border-color:var(--steel); } .box.heard .who { color:var(--steel); }
+  .mic { width:120px; min-height:96px; color:#fff; background:var(--steel); font-weight:600; font-size:17px; }
+  .mic.live { background:var(--amber); }
+  .offer { float:right; background:var(--amber); color:#fff; padding:6px 12px; font-size:15px; }
+
+  /* patient page */
+  #patient .bar { margin:-6px -14px 8px; padding:12px; color:#fff; text-align:center; font-size:22px; background:var(--steel); }
+  #ptWrap { display:flex; gap:12px; align-items:flex-start; }
+  #ptDst { flex:1; font-size:32px; line-height:1.3; text-align:center; min-height:84px; }
+  #ptDst.rtl { direction:rtl; }
+  #repeat { width:120px; min-height:92px; color:#fff; background:var(--steel); font-weight:600; }
+  #repeat .g { display:block; font-size:32px; line-height:1; margin-bottom:6px; }
+  #ptNote { text-align:center; color:var(--amber); font-size:15px; min-height:1.3em; }
+  #ptSrc { text-align:center; color:var(--muted); margin-bottom:10px; }
+  #replies { display:grid; grid-template-columns:repeat(4, 1fr); gap:10px; flex:1; align-content:start; overflow:auto; }
+  #replies button { border:2px solid var(--steel); min-height:92px; padding:8px; font-size:21px; line-height:1.2; }
+  #replies button .s { display:block; font-size:13px; color:var(--muted); margin-top:4px; }
+  #replies button.rtl { direction:rtl; }
+  .bottom { display:flex; gap:12px; margin-top:10px; align-items:stretch; flex:0 0 auto; }
+  .result { flex:1; background:var(--panel); border:2px solid var(--line); border-radius:14px; padding:10px 12px; min-height:92px; }
+  .back { width:150px; color:#fff; background:var(--sage); font-weight:600; }
+
+  /* reply page */
+  #reply .cols { display:flex; gap:12px; flex:1; min-height:0; }
+  #reply .col { flex:1; display:flex; flex-direction:column; min-height:0; }
+  #reply .col h3 { margin:-6px 0 8px; padding:12px; border-radius:12px; color:#fff; text-align:center; font-size:18px; font-weight:600; }
+  #reply .col .txt { flex:1; overflow:auto; font-size:23px; line-height:1.35; padding:8px; }
+  #rpHeard.rtl { direction:rtl; }
+
+  /* add page */
+  #add .cols { display:flex; gap:16px; flex:1; min-height:0; }
+  #add .col { flex:1; display:flex; flex-direction:column; gap:10px; min-height:0; overflow:auto; }
+  #add h3 { margin:6px 0 0; font-size:17px; color:var(--muted); font-weight:600; }
+  #addText { min-height:110px; font-size:20px; resize:none; }
+  .primary { background:var(--sage); color:#fff; font-weight:600; }
+  .secondary { background:var(--panel); border:1px solid var(--line); }
+  .warn { background:var(--brick); color:#fff; }
+
+  /* volunteer sheet */
+  #sheet { position:fixed; inset:0; background:rgba(27,38,33,.45); display:flex; align-items:center; justify-content:center; padding:20px; z-index:10; }
+  #sheet .card { background:var(--panel); border-radius:18px; padding:20px 22px; max-width:560px; width:100%; text-align:left; font-size:17px; border:0; }
+  #sheet label { display:block; margin:8px 0 4px; color:var(--muted); font-size:15px; }
+  #sheet input, #sheet select { width:100%; }
+  #sheet .consent { margin:12px 0; display:flex; gap:10px; align-items:flex-start; }
+  #sheet .consent input { width:22px; height:22px; margin-top:2px; }
+</style>
+</head>
+<body>
+
+<header id="hdr" class="hidden">
+  <button class="chip" id="srcChip"></button><span class="arrow">→</span><button class="chip" id="dstChip"></button>
+  <button class="secondary small" id="change">change</button>
+  <span class="spacer"></span>
+  <button id="mode">+ Add phrase</button>
+  <select id="cat"><option value="">All categories</option></select>
+</header>
+
+<!-- 1. I speak… -->
+<section class="screen" id="start">
+  <div class="title" style="color:var(--sage)">I speak…</div>
+  <div class="sub">Step 1 of 2 — the clinician's language</div>
+  <div class="langs" id="srcLangs"></div>
+</section>
+
+<!-- 2. Translate to… -->
+<section class="screen hidden" id="to">
+  <div class="title" style="color:var(--steel)">Translate to…</div>
+  <div class="sub" id="toSub">Step 2 of 2 — the patient's language</div>
+  <div class="langs" id="dstLangs"></div>
+  <div class="row" style="margin-top:8px"><button class="secondary" id="toBack">Back — change the language I speak</button></div>
+</section>
+
+<!-- 3. conversation -->
+<section class="screen hidden" id="main">
+  <div id="grid"></div>
+  <div class="convo">
+    <div class="box said"><div class="who">Clinician <button class="offer hidden" id="offer">Record it</button></div><div id="said">Tap a phrase to say it.</div></div>
+    <div class="box heard"><div class="who">Heard</div><div id="heard">—</div></div>
+    <button class="mic" id="mic">●<br>Record</button>
+  </div>
+</section>
+
+<!-- 4. patient page -->
+<section class="screen hidden" id="patient">
+  <div class="bar" id="ptBar"></div>
+  <div id="ptWrap">
+    <div id="ptDst"></div>
+    <button id="repeat"><span class="g">↻</span><span id="repeatLbl">Hear it again</span></button>
+  </div>
+  <div id="ptNote"></div>
+  <div id="ptSrc"></div>
+  <div id="replies"></div>
+  <div class="bottom">
+    <div class="result"><div class="who muted small">Reply, for the clinician</div><div id="ptResult">—</div></div>
+    <button class="mic" id="ptMic">● Tap to reply</button>
+    <button class="back" id="ptBack">Back to clinician</button>
+  </div>
+</section>
+
+<!-- 5. the patient's reply, translated -->
+<section class="screen hidden" id="reply">
+  <div class="cols">
+    <div class="col"><h3 style="background:var(--steel)">Patient said</h3><div class="txt" id="rpHeard"></div></div>
+    <div class="col"><h3 style="background:var(--sage)">For the clinician</h3><div class="txt" id="rpTrans"></div></div>
+  </div>
+  <div class="bottom">
+    <div class="muted small grow" id="rpTime" style="align-self:center"></div>
+    <button class="mic" id="rpAgain">Reply again</button>
+    <button class="back" id="rpBack">Back to clinician</button>
+  </div>
+</section>
+
+<!-- 6. add to the phrasebook -->
+<section class="screen hidden" id="add">
+  <div class="row"><div class="title grow" id="addTitle">Add to the phrasebook</div><button class="secondary" id="addBack">Back</button></div>
+  <div class="cols">
+    <div class="col">
+      <h3>New phrase — pick a category, say it in English (or type it), then save</h3>
+      <div class="row"><select id="addCat" class="grow"></select><button class="primary" id="addMic">●  Say it</button></div>
+      <textarea id="addText" placeholder="The words appear here — tap to edit" maxlength="200"></textarea>
+      <div class="row"><button class="primary" id="addSave">Save phrase</button><div class="amber small grow" id="addStatus"></div></div>
+      <h3>Add a language (Whisper hears it, NLLB drafts it)</h3>
+      <div class="row"><select id="addLang" class="grow"><option>loading…</option></select><button class="primary" id="addLangBtn" style="background:var(--steel)">Add</button></div>
+    </div>
+    <div class="col">
+      <h3>Translations</h3>
+      <div class="muted small">Record mode: tap a phrase on the main screen, read it aloud in the patient's language, tap it again to save. Each take is filed as a batch with a Whisper draft.</div>
+      <button class="primary" style="background:var(--amber)" id="addRec">Record translations →</button>
+      <h3>Session</h3>
+      <div class="muted small" id="whoami"></div>
+      <div class="row"><button class="secondary" id="unpair">Forget this pairing</button><button class="warn" id="shutdown">Shut down the Nano</button></div>
+      <div class="muted small">Setup for another iPad: <code id="setupUrl"></code></div>
+    </div>
+  </div>
+</section>
+
+<!-- volunteer sheet: who is recording + consent (before Record mode / Add) -->
+<div id="sheet" class="hidden">
+  <div class="card">
+    <div class="title" style="font-size:22px">Volunteer recording</div>
+    <label>Your initials (2–12 letters/digits)</label><input id="spkId" maxlength="12" autocapitalize="none" autocorrect="off" placeholder="e.g. mg">
+    <label>I am a</label><select id="spkType"><option value="native">native speaker</option><option value="fluent">fluent speaker</option><option value="learner">learner</option><option value="staff">staff</option></select>
+    <div class="consent"><input type="checkbox" id="consent"><label for="consent" style="margin:0;color:var(--ink);font-size:16px">I confirm I am recording my own voice reading clinical phrases for the local medical interpreter project. I agree these recordings may be stored on the practice's own equipment and used to test and train its interpretation system. No patient information is involved. I can ask for my recordings to be deleted by quoting my speaker ID.</label></div>
+    <div class="row"><button class="secondary" id="sheetCancel">Cancel</button><span class="grow"></span><button class="primary" id="sheetGo">Continue</button></div>
+  </div>
+</div>
+
+<div id="status">connecting…</div>
+
+<script>
+(function () {
+  "use strict";
+  // ================= state =================
+  const S = {
+    token: null, name: "iPad",
+    src: null, dst: null,                 // language codes (clinician, patient)
+    data: null,                           // last GET /phrases
+    cat: "", mode: "speak",               // speak | record
+    turn: 0,                              // 0 = clinician talking, 1 = patient
+    spk: null, consented: false,          // volunteer sheet
+    cur: null, last: null, used: null,    // phrase index on the patient page / last tapped / card wearing the colour
+    rec: null,                            // live recording {ctx, proc, stream, chunks, startedAt, ctxInfo}
+    addFile: "",                          // Nano temp take behind the words in the Add box
+    pendingSheet: null,                   // what to do after the sheet: "add" | "record" | index
+  };
+  const $ = (id) => document.getElementById(id);
+  try { S.token = localStorage.getItem("pk_token"); S.name = localStorage.getItem("pk_name") || "iPad"; } catch (e) {}
+  if (!S.token) { location.replace("/setup"); return; }
+  try { S.src = localStorage.getItem("pk_src"); S.dst = localStorage.getItem("pk_dst"); } catch (e) {}
+  if (location.protocol === "https:" && "serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
+
+  // ================= API =================
+  async function api(path, opts) {
+    opts = opts || {};
+    const q = Object.assign({}, opts.query || {});
+    const qs = Object.keys(q).filter((k) => q[k] !== undefined && q[k] !== null && q[k] !== "").map((k) => k + "=" + encodeURIComponent(q[k])).join("&");
+    const r = await fetch(path + (qs ? "?" + qs : ""), { method: opts.method || "GET", headers: { Authorization: "Bearer " + S.token }, body: opts.body || null });
+    if (r.status === 401) { try { localStorage.removeItem("pk_token"); } catch (e) {} location.replace("/setup"); throw new Error("not paired"); }
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j.say || j.error || ("HTTP " + r.status));
+    return j;
+  }
+  const post = (path, query, body) => api(path, { method: "POST", query, body });
+
+  // ================= audio out (the iPad's speaker) =================
+  // Web Audio, not <audio>: Chrome defers <audio> loads in hidden tabs and iOS treats the two the same
+  // way — both need one tap to unlock. The first touch anywhere resumes a shared AudioContext (and plays a
+  // silent clip through the <audio> fallback), so every later play() is allowed even after an await.
+  const AC = window.AudioContext || window.webkitAudioContext;
+  let actx = null, playing = null;
+  const player = new Audio();
+  const SILENT = "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQAAAAA=";
+  function unlock() {
+    if (!actx) { try { actx = new AC(); } catch (e) {} }
+    if (actx && actx.state !== "running") actx.resume().catch(() => {});
+    if (!player.dataset.unlocked) { player.dataset.unlocked = "1"; player.src = SILENT; player.play().catch(() => {}); }
+  }
+  document.addEventListener("pointerdown", unlock, { capture: true });
+  document.addEventListener("touchend", unlock, { capture: true });
+  async function playOne(url) {
+    const gen = playing = {};
+    try {
+      const buf = await (await fetch(url, { headers: { Authorization: "Bearer " + S.token } })).arrayBuffer();
+      if (playing !== gen) return;                                   // a newer tap cut this one off
+      if (actx && actx.state === "running") {
+        const data = await actx.decodeAudioData(buf);
+        if (playing !== gen) return;
+        await new Promise((res) => { const src = actx.createBufferSource(); src.buffer = data; src.connect(actx.destination); src.onended = res; gen.src = src; src.start(); });
+        return;
+      }
+    } catch (e) { /* fall through to the element */ }
+    if (playing !== gen) return;
+    await new Promise((res) => { player.onended = res; player.onerror = res; player.src = url; player.play().catch(res); });
+  }
+  async function playAll(urls) { for (const u of urls || []) { await playOne(u); } }
+  function stopPlaying() {
+    const g = playing; playing = null;
+    if (g && g.src) { try { g.src.stop(); } catch (e) {} }
+    try { player.pause(); player.currentTime = 0; } catch (e) {}
+  }
+
+  // ================= audio in (the iPad's mic → WAV, as public/index.html does) =================
+  async function startRec() {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true } });
+    const ctx = new AC();                                          // a fresh context per take: closing it frees the mic cleanly
+    await ctx.resume();
+    const src = ctx.createMediaStreamSource(stream);
+    const proc = ctx.createScriptProcessor(4096, 1, 1);          // the one path that works on every iPad
+    const chunks = [];
+    proc.onaudioprocess = (e) => chunks.push(new Float32Array(e.inputBuffer.getChannelData(0)));
+    src.connect(proc); proc.connect(ctx.destination);
+    S.rec = { ctx, proc, src, stream, chunks, startedAt: Date.now(), timer: null };
+    return S.rec;
+  }
+  async function stopRec() {
+    const r = S.rec; if (!r) return null;
+    S.rec = null;
+    clearInterval(r.timer);
+    try { r.src.disconnect(); r.proc.disconnect(); } catch (e) {}
+    r.stream.getTracks().forEach((t) => t.stop());
+    const rate = r.ctx.sampleRate;
+    try { await r.ctx.close(); } catch (e) {}
+    let n = 0; for (const c of r.chunks) n += c.length;
+    const buf = new ArrayBuffer(44 + n * 2), v = new DataView(buf);
+    const str = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+    str(0, "RIFF"); v.setUint32(4, 36 + n * 2, true); str(8, "WAVE"); str(12, "fmt "); v.setUint32(16, 16, true);
+    v.setUint16(20, 1, true); v.setUint16(22, 1, true); v.setUint32(24, rate, true); v.setUint32(28, rate * 2, true);
+    v.setUint16(32, 2, true); v.setUint16(34, 16, true); str(36, "data"); v.setUint32(40, n * 2, true);
+    let o = 44;
+    for (const c of r.chunks) for (let i = 0; i < c.length; i++, o += 2) { const s = Math.max(-1, Math.min(1, c[i])); v.setInt16(o, s < 0 ? s * 0x8000 : s * 0x7FFF, true); }
+    return { blob: new Blob([buf], { type: "audio/wav" }), startedAt: r.startedAt, seconds: n / rate };
+  }
+  function timerOn(el, prefix) {
+    const r = S.rec; if (!r) return;
+    const tick = () => { el.innerHTML = prefix + "<br><span class='small'>" + Math.round((Date.now() - r.startedAt) / 1000) + " s</span>"; };
+    tick(); r.timer = setInterval(tick, 500);
+  }
+
+  // ================= languages =================
+  const COLOURS = { en: "#4A7A68", mi: "#1B7F79", ar: "#8E5B2E", es: "#C2711D", fa: "#2F5DA8", prs: "#4B6FB5", hi: "#B33A7A", vi: "#6A8F1F", zh: "#B8322E",
+                    yue: "#9B2C5F", ja: "#5A4FA8", ko: "#1F6E9A", lo: "#7A5E1E", pa: "#A0522D", sm: "#2A7A9B", tl: "#8A6D0E", to: "#3E6B3E" };
+  const EXTRA = ["#7B4F9E", "#2E7D6B", "#9E5A2E", "#3D6BA8", "#8A2E5E", "#5E7A1F", "#1F7A8A", "#A8552E"];
+  function colour(code) { if (COLOURS[code]) return COLOURS[code]; let h = 5381; for (const c of code) h = (h * 33 + c.charCodeAt(0)) >>> 0; return EXTRA[h % 8]; }
+  const langs = () => (S.data && S.data.languages) || [];
+  const langName = (code) => { const l = langs().find((x) => x.code === code); return l ? l.label : code; };
+  const isRtl = (code) => ["ar", "fa", "prs", "ur", "ps", "he"].includes(code);
+
+  function show(id) {
+    for (const s of document.querySelectorAll("section.screen")) s.classList.toggle("hidden", s.id !== id);
+    $("hdr").classList.toggle("hidden", id === "start" || id === "to");
+  }
+
+  // ---- wizard ----
+  function renderLangs(el, step) {
+    el.innerHTML = "";
+    for (const l of langs()) {
+      if (step === "to" && l.code === S.src) continue;
+      const b = document.createElement("button");
+      b.textContent = l.label; b.style.borderColor = colour(l.code);
+      b.onclick = () => {
+        if (step === "src") { S.src = l.code; $("toSub").textContent = "Step 2 of 2 — the patient's language  (you speak " + l.label + ")"; renderLangs($("dstLangs"), "to"); show("to"); }
+        else { S.dst = l.code; try { localStorage.setItem("pk_src", S.src); localStorage.setItem("pk_dst", S.dst); } catch (e) {} applyPair(); }
+      };
+      el.appendChild(b);
+    }
+  }
+  async function applyPair() {
+    $("srcChip").textContent = langName(S.src); $("srcChip").style.background = colour(S.src);
+    $("dstChip").textContent = langName(S.dst); $("dstChip").style.background = colour(S.dst);
+    $("ptBar").style.background = colour(S.dst); $("ptMic").style.background = colour(S.dst); $("repeat").style.background = colour(S.dst);
+    setTurn(0);
+    $("said").textContent = "Tap a phrase to say it."; $("heard").textContent = "—";
+    S.cat = ""; S.used = null;
+    await loadPhrases();
+    post("/panel/session", { src: S.src, dst: S.dst }).catch(() => {});
+    show("main");
+  }
+  function setTurn(t) {
+    S.turn = t;
+    $("srcChip").classList.toggle("on", t === 0); $("dstChip").classList.toggle("on", t === 1);
+    $("mic").style.background = colour(t === 0 ? S.src : S.dst);
+    if (!S.rec) $("said").textContent = t === 0 ? "Clinician speaking — tap a phrase, or tap the mic to say something else" : "Patient speaking — tap the mic, then Stop";
+  }
+
+  // ---- phrases ----
+  async function loadPhrases() {
+    S.data = await api("/phrases", { query: { lang: S.dst, src: S.src, raw: 1 } });
+    const cat = $("cat"); const keep = cat.value; cat.innerHTML = '<option value="">All categories</option>';
+    for (const c of S.data.categories) { const o = document.createElement("option"); o.value = c.slug; o.textContent = c.label; cat.appendChild(o); }
+    cat.value = keep;
+    renderGrid();
+  }
+  const draftOf = (p) => p.translation || p.draft || "";
+  function renderGrid() {
+    const g = $("grid"); g.innerHTML = "";
+    S.data.phrases.forEach((p, i) => {
+      if (p.category === "patient_replies" || p.category === "panel_ui") return;
+      if (S.cat && p.category !== S.cat) return;
+      const b = document.createElement("button"); b.className = "card";
+      const shown = S.src === "en" ? p.text : (p.src_text || p.src_draft || p.text);
+      b.innerHTML = "<span class='key'>" + p.key + "</span>" + (p.recording ? "<span class='rec'>●</span>" : "") + esc(shown) +
+                    (S.mode === "record" && S.dst !== "en" ? "<span class='src'>" + esc(draftOf(p) || "no " + langName(S.dst) + " text yet") + "</span>" : "");
+      if (S.src !== "en" && p.src_draft && !p.src_text) b.style.color = "var(--amber)";
+      if (i === S.used) { b.classList.add("used"); b.style.background = colour(S.dst); b.style.borderColor = colour(S.dst); }
+      b.onclick = () => tapPhrase(i);
+      g.appendChild(b);
+    });
+  }
+  const esc = (s) => String(s == null ? "" : s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+  async function tapPhrase(i) {
+    const p = S.data.phrases[i];
+    S.last = i; $("offer").classList.add("hidden");
+    if (S.mode === "record") return recordTake(i);
+    stopPlaying();
+    $("said").textContent = "…";
+    try {
+      const r = await post("/panel/" + p.key, { lang: S.dst, src: S.src, client: 1 });
+      $("said").textContent = r.src_text || p.text;
+      if (r.offer_record) $("offer").classList.remove("hidden");
+      S.used = i; renderGrid();
+      showPatient(i, r);
+      playAll(r.audio);
+    } catch (e) { $("said").textContent = e.message; }
+  }
+
+  // ---- patient page ----
+  function showPatient(i, r) {
+    S.cur = i;
+    const p = S.data.phrases[i];
+    let dst = p.translation, note = "", amber = false;
+    if (!dst && p.draft) { dst = p.draft; note = "unverified — machine translation, not yet checked by a speaker"; amber = true; }
+    if (!dst) { dst = p.text; note = "no " + langName(S.dst) + " version yet — shown in English"; }
+    if (r && r.note && !note) note = r.note;
+    $("ptBar").textContent = langName(S.dst);
+    const d = $("ptDst"); d.textContent = dst; d.style.color = amber ? "var(--amber)" : "var(--ink)"; d.classList.toggle("rtl", isRtl(S.dst) && dst !== p.text);
+    $("ptNote").textContent = note; $("ptSrc").textContent = p.src_text || p.text;
+    const hear = uiText("p023", "Hear it again"); $("repeatLbl").textContent = hear;
+    const rp = $("replies"); rp.innerHTML = "";
+    for (const q of S.data.phrases.filter((x) => x.category === "patient_replies")) {
+      const b = document.createElement("button");
+      const t = q.translation || q.draft || q.text;
+      b.innerHTML = esc(t) + "<span class='s'>" + esc(q.src_text || q.text) + "</span>";
+      if (!q.translation && q.draft) b.style.color = "var(--amber)";
+      b.classList.toggle("rtl", isRtl(S.dst) && t !== q.text);
+      b.onclick = () => replyTap(q);
+      rp.appendChild(b);
+    }
+    $("ptResult").textContent = "—";
+    micLabel();
+    show("patient");
+  }
+  function uiText(key, fallback) { const p = (S.data.phrases || []).find((x) => x.key === key); return (p && (p.translation || p.draft)) || fallback; }
+  function micLabel() {
+    const m = $("ptMic");
+    if (S.rec && S.turn === 1) m.innerHTML = "■ " + esc(uiText("p021", "Stop")); else m.innerHTML = "● " + esc(uiText("p020", "Tap to reply"));
+    m.classList.toggle("live", !!(S.rec && S.turn === 1));
+  }
+  $("repeat").onclick = async () => {
+    if (S.cur == null) return; stopPlaying();
+    try { const r = await post("/panel/" + S.data.phrases[S.cur].key, { lang: S.dst, src: S.src, client: 1, repeat: 1 }); playAll(r.audio); } catch (e) {}
+  };
+  async function replyTap(q) {
+    setTurn(1); stopPlaying();
+    $("ptResult").textContent = "…";
+    try {
+      const r = await post("/panel/reply/" + q.key, { lang: S.dst, src: S.src, client: 1 });
+      $("ptResult").textContent = r.say; $("heard").textContent = r.say;
+      playAll(r.audio);
+    } catch (e) { $("ptResult").textContent = e.message; }
+  }
+  $("ptBack").onclick = () => { setTurn(0); show("main"); };
+
+  // ---- free speech: whoever's turn it is (clinician on main, patient on the patient page) ----
+  async function freeSpeech(btn, who) {
+    if (S.rec) {                                          // stop → upload → show the result
+      const take = await stopRec();
+      btn.classList.remove("live"); micLabel(); $("mic").innerHTML = "●<br>Record";
+      const listen = who === "clinician" ? S.src : S.dst, to = who === "clinician" ? S.dst : S.src;
+      const target = who === "clinician" ? $("said") : $("ptResult");
+      target.textContent = "Transcribing…";
+      try {
+        const r = await post("/panel/transcribe", { lang: listen, src: to, who, speak: 1, client: 1, raw: 1 }, take.blob);
+        if (!r.text) { target.textContent = r.say || "(nothing heard)"; return; }
+        if (who === "clinician") {
+          $("said").textContent = r.text + (r.translated ? "  →  " + r.translated : "");
+          if (r.translated) showFree(r.text, r.translated);
+        } else {
+          $("ptResult").textContent = r.say; $("heard").textContent = r.translated || r.text;
+          $("rpHeard").textContent = r.text; $("rpHeard").classList.toggle("rtl", isRtl(S.dst));
+          $("rpTrans").textContent = r.translated || "(no translation — is the translator running?)";
+          $("rpTime").textContent = "Reply took " + Math.round((Date.now() - take.startedAt) / 1000) + " s";
+          $("rpAgain").textContent = uiText("p022", "Reply again"); $("rpAgain").style.background = colour(S.dst);
+          show("reply");
+        }
+        playAll(r.audio);
+      } catch (e) { target.textContent = e.message; }
+      return;
+    }
+    stopPlaying();
+    try { await startRec(); } catch (e) { alertStatus("Microphone not available: " + e.message + " — is this page open over https and trusted?"); return; }
+    btn.classList.add("live");
+    if (who === "clinician") { $("said").textContent = "Listening…"; timerOn($("mic"), "■ Stop"); }
+    else { $("ptResult").textContent = "Listening…"; micLabel(); timerOn($("ptMic"), "■ " + esc(uiText("p021", "Stop"))); }
+  }
+  function showFree(heard, translated) {          // the clinician said something free-form: show it to the patient
+    S.cur = null;
+    $("ptBar").textContent = langName(S.dst);
+    const d = $("ptDst"); d.textContent = translated; d.style.color = "var(--amber)"; d.classList.toggle("rtl", isRtl(S.dst));
+    $("ptNote").textContent = "machine translation of what the clinician just said"; $("ptSrc").textContent = heard;
+    $("replies").innerHTML = ""; $("ptResult").textContent = "—";
+    for (const q of S.data.phrases.filter((x) => x.category === "patient_replies")) {
+      const b = document.createElement("button"); const t = q.translation || q.draft || q.text;
+      b.innerHTML = esc(t) + "<span class='s'>" + esc(q.src_text || q.text) + "</span>"; b.onclick = () => replyTap(q); $("replies").appendChild(b);
+    }
+    micLabel(); show("patient");
+  }
+  $("mic").onclick = () => { if (S.mode === "record") { if (S.rec && S.last != null) recordTake(S.last); return; } setTurn(S.turn); freeSpeech($("mic"), S.turn === 0 ? "clinician" : "patient"); };
+  $("ptMic").onclick = () => { setTurn(1); freeSpeech($("ptMic"), "patient"); };
+  $("rpAgain").onclick = () => { if (S.cur != null) showPatient(S.cur); else show("patient"); };
+  $("rpBack").onclick = () => { setTurn(0); show("main"); };
+  $("srcChip").onclick = () => setTurn(0); $("dstChip").onclick = () => setTurn(1);
+  $("change").onclick = () => { renderLangs($("srcLangs"), "src"); show("start"); };
+  $("toBack").onclick = () => { renderLangs($("srcLangs"), "src"); show("start"); };
+  $("cat").onchange = () => { S.cat = $("cat").value; renderGrid(); };
+
+  // ---- Record mode: a volunteer reads phrases in the patient's language; takes become batches ----
+  let recPhrase = null;
+  async function recordTake(i) {
+    const p = S.data.phrases[i];
+    if (S.rec && recPhrase === i) {                       // second tap on the same card = stop and save
+      const take = await stopRec(); recPhrase = null; $("mic").innerHTML = "●<br>Record"; $("mic").classList.remove("live");
+      $("said").textContent = "Saving take…";
+      try {
+        const r = await post("/panel/transcribe", { lang: S.dst, src: S.src, phrase: p.key, speaker: S.spk.id, type: S.spk.type, consent: 1, started: take.startedAt, raw: 1 }, take.blob);
+        $("said").textContent = r.say; await loadPhrases();
+      } catch (e) { $("said").textContent = e.message; }
+      return;
+    }
+    if (S.rec) await stopRec();
+    recPhrase = i;
+    const read = S.dst === "en" ? p.text : p.translation;
+    $("said").textContent = read ? "Read aloud:\n" + read : "No " + langName(S.dst) + " text yet — say it in your own words:\n" + p.text;
+    try { await startRec(); } catch (e) { alertStatus("Microphone not available: " + e.message); recPhrase = null; return; }
+    $("mic").classList.add("live"); timerOn($("mic"), "■ Stop");
+  }
+  function setMode(on) {
+    S.mode = on ? "record" : "speak";
+    const m = $("mode"); m.classList.toggle("rec", on); m.textContent = on ? "● " + S.spk.id + " · done" : "+ Add phrase";
+    $("said").textContent = on ? "Tap a phrase, read it aloud, tap it again to save." : "Tap a phrase to say it.";
+    renderGrid();
+  }
+  $("mode").onclick = () => { if (S.mode === "record") { if (S.rec) stopRec(); setMode(false); return; } needSheet("add"); };
+  $("offer").onclick = () => { $("offer").classList.add("hidden"); needSheet(S.last); };
+
+  // ---- volunteer sheet ----
+  function needSheet(then) {
+    S.pendingSheet = then;
+    if (S.spk && S.consented) return afterSheet();
+    $("sheet").classList.remove("hidden");
+  }
+  function afterSheet() {
+    const t = S.pendingSheet; S.pendingSheet = null;
+    if (t === "add") openAdd(); else if (typeof t === "number") { setMode(true); recordTake(t); } else setMode(true);
+  }
+  $("sheetCancel").onclick = () => $("sheet").classList.add("hidden");
+  $("sheetGo").onclick = () => {
+    const id = $("spkId").value.trim().toLowerCase();
+    if (!/^[a-z0-9]{2,12}$/.test(id)) { $("spkId").placeholder = "initials?"; $("spkId").value = ""; return; }
+    if (!$("consent").checked) { $("consent").focus(); return; }
+    S.spk = { id, type: $("spkType").value }; S.consented = true;
+    $("sheet").classList.add("hidden"); afterSheet();
+  };
+
+  // ---- Add page ----
+  async function openAdd() {
+    $("addTitle").textContent = "Add to the phrasebook  ·  " + S.spk.id + " (" + S.spk.type + ")";
+    const c = $("addCat"); c.innerHTML = "";
+    for (const k of S.data.categories) { const o = document.createElement("option"); o.value = k.slug; o.textContent = k.label; c.appendChild(o); }
+    c.value = "intake";
+    $("addText").value = ""; $("addStatus").textContent = ""; S.addFile = ""; $("addMic").textContent = "●  Say it";
+    $("addRec").textContent = "Record translations in " + langName(S.dst) + " →";
+    $("whoami").textContent = "This iPad is paired as “" + S.name + "”. Clinician " + langName(S.src) + " → patient " + langName(S.dst) + ".";
+    $("setupUrl").textContent = location.origin + "/setup";
+    show("add");
+    try {
+      const r = await api("/admin/languages"); const s = $("addLang"); s.innerHTML = "";
+      for (const l of r.languages) { const o = document.createElement("option"); o.value = l.code; o.textContent = l.label + (l.font ? "" : " (font will download)"); s.appendChild(o); }
+      if (!r.languages.length) s.innerHTML = "<option value=''>— every known language is in —</option>";
+    } catch (e) { $("addLang").innerHTML = "<option value=''>" + esc(e.message) + "</option>"; }
+  }
+  $("addBack").onclick = async () => { if (S.rec) await stopRec(); show("main"); };
+  $("addMic").onclick = async () => {
+    if (S.rec) {
+      const take = await stopRec(); $("addMic").textContent = "●  Say it"; $("addStatus").textContent = "Transcribing…";
+      try {
+        const r = await post("/panel/transcribe", { lang: "en", src: "en", who: "add", raw: 1 }, take.blob);
+        if (!r.text) { $("addStatus").textContent = "Nothing heard — try again, a little closer to the iPad."; return; }
+        $("addText").value = r.text; S.addFile = r.file || "";
+        $("addStatus").textContent = "Check the words (tap the box to edit), then Save phrase.";
+      } catch (e) { $("addStatus").textContent = e.message; }
+      return;
+    }
+    try { await startRec(); } catch (e) { $("addStatus").textContent = "Microphone not available: " + e.message; return; }
+    $("addMic").textContent = "■  Stop"; $("addStatus").textContent = "Listening — tap ■ when you have said it.";
+  };
+  $("addSave").onclick = async () => {
+    const text = $("addText").value.trim();
+    if (S.rec) { $("addStatus").textContent = "Tap ■ first."; return; }
+    if (text.length < 3) { $("addStatus").textContent = "Say the phrase (or type it) before saving."; return; }
+    $("addStatus").textContent = "Saving…";
+    try {
+      const r = await post("/panel/phrase", { text, category: $("addCat").value, speaker: S.spk.id, type: S.spk.type, file: S.addFile });
+      $("addStatus").textContent = r.say; $("addText").value = ""; S.addFile = ""; await loadPhrases();
+    } catch (e) { $("addStatus").textContent = e.message; }
+  };
+  $("addLangBtn").onclick = async () => {
+    const code = $("addLang").value; if (!code) return;
+    $("addStatus").textContent = "Adding the language (fetching its font if needed)…";
+    try { const r = await post("/panel/language", { code }); $("addStatus").textContent = r.say; await loadPhrases(); openAdd(); }
+    catch (e) { $("addStatus").textContent = e.message; }
+  };
+  $("addRec").onclick = () => { setMode(true); show("main"); };
+  $("unpair").onclick = () => { try { localStorage.removeItem("pk_token"); } catch (e) {} location.replace("/setup"); };
+  let armed = 0;
+  $("shutdown").onclick = async () => {
+    if (Date.now() - armed > 4000) { armed = Date.now(); $("shutdown").textContent = "Tap again to shut down"; setTimeout(() => { $("shutdown").textContent = "Shut down the Nano"; }, 4000); return; }
+    try { await post("/panel/shutdown"); alertStatus("Nano is shutting down."); } catch (e) { alertStatus(e.message); }
+  };
+
+  // ---- health / status line / resume ----
+  function alertStatus(msg) { const s = $("status"); s.textContent = msg; s.classList.add("bad"); setTimeout(health, 4000); }
+  async function health() {
+    try {
+      const r = await fetch("/health", { headers: { Authorization: "Bearer " + S.token } }); const h = await r.json();
+      const s = $("status"); s.classList.remove("bad");
+      s.textContent = "Nano ✓  ·  speech " + (h.whisper && h.piper ? "✓" : "✗") + "  ·  translator " + (h.translator ? "✓ " + h.translator : "starting…") + "  ·  db " + (h.db ? "✓" : "✗") + "  ·  " + location.host;
+    } catch (e) { const s = $("status"); s.textContent = "Nano not reachable at " + location.host + " — same Wi-Fi?"; s.classList.add("bad"); }
+  }
+  setInterval(health, 10000); health();
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && S.data) { health(); loadPhrases().catch(() => {}); } });
+
+  // ---- go ----
+  (async () => {
+    try { S.data = await api("/phrases", { query: { lang: S.dst || "en", src: S.src || "en", raw: 1 } }); }
+    catch (e) { alertStatus(e.message); return; }
+    if (S.src && S.dst && langs().some((l) => l.code === S.src) && langs().some((l) => l.code === S.dst)) applyPair();
+    else { renderLangs($("srcLangs"), "src"); show("start"); }
+  })();
+})();
+</script>
+</body>
+</html>

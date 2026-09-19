@@ -36,8 +36,10 @@ Routes (JSON responses; the panel only reads the first ~60 chars of `say`):
 import hashlib
 import json
 import re
+import mimetypes
 import signal
 import socket
+import ssl
 import subprocess
 import sys
 import threading
@@ -74,6 +76,16 @@ PHRASES = HERE / "phrases.json"
 PIPER = Path.home() / ".local/bin/piper"
 VOICES = Path.home() / "piper-voices"
 WORK = Path.home() / "phrase-recordings" / "_panel"      # tts cache + panel recordings
+WEB = HERE / "web"                                        # the iPad client (nano/web/), served at /
+TLS_PORT = 8766                                           # HTTPS twin of :8765 — iPads need it for the mic
+RUNTIME = Path("/run/phrase-panel")                       # exists when the systemd unit runs us (nano/install.sh)
+MAX_UPLOAD = 60 * 1024 * 1024                             # a WAV from the iPad: ~10 minutes at 48 kHz mono
+# Paths any client may fetch without a device token: the setup page and what it needs, audio/render
+# fetches (their ids are unguessable / their content is what the caller sent), health, pairing.
+PUBLIC_GET = {"/", "/index.html", "/app.js", "/app.css", "/setup", "/setup.html", "/manifest.webmanifest", "/sw.js",
+              "/icon.svg", "/icon-192.png", "/icon-512.png", "/ca.crt", "/health", "/render", "/render/replies"}
+PUBLIC_POST = {"/pair"}
+AUDIO_IDS = {}                                            # unguessable id -> Path, for GET /audio/<id>
 AUDIO_DEV = "plughw:0,0"                                # the USB PnP sound device: mic + speaker
 WHISPER_MODEL = "ggml-large-v3-turbo-q5_0.bin"
 PORT = 8765
@@ -137,8 +149,17 @@ def recording_index():
     return idx
 
 
+def serve_audio(path):
+    """URL the client can fetch this WAV from. Ids are keyed on the path, so the same file gets the same URL."""
+    aid = hashlib.sha256(str(path).encode() + b"phrasekit").hexdigest()[:32]
+    AUDIO_IDS[aid] = Path(path)
+    return f"/audio/{aid}"
+
+
 class Audio:
-    """One speaker, one mic: a new phrase cuts the previous one off; one take at a time."""
+    """One speaker, one mic: a new phrase cuts the previous one off; one take at a time.
+    Every play/say takes `client`: True means "synthesise but do not play — return the WAV paths",
+    for an iPad that plays through its own speaker."""
     def __init__(self):
         self.lock = threading.Lock()
         self.player = None
@@ -166,9 +187,12 @@ class Audio:
                            input=text, text=True, check=True, capture_output=True)
         return wav
 
-    def say(self, text, lang, then=None):
+    def say(self, text, lang, then=None, client=False):
         """Speak text; `then` = (text, lang) to say straight after (e.g. a warning, then the phrase).
-        Synthesis + playback run in the background so the panel gets its reply immediately."""
+        Synthesis + playback run in the background so the panel gets its reply immediately.
+        client=True: synthesise now and return the WAV paths for the caller to play."""
+        if client:
+            return [self.synth(text, lang)] + ([self.synth(*then)] if then else [])
         def run():
             try:
                 wavs = [self.synth(text, lang)] + ([self.synth(*then)] if then else [])
@@ -177,7 +201,9 @@ class Audio:
                 log("piper failed:", (e.stderr or b"")[-200:])
         threading.Thread(target=run, daemon=True).start()
 
-    def play(self, *wavs):
+    def play(self, *wavs, client=False):
+        if client:
+            return list(wavs)
         with self.lock:
             if self.player and self.player.poll() is None:
                 self.player.terminate()
@@ -262,36 +288,106 @@ def pregen(lang):
     log(f"pregen {lang}: {n} phrases cached")
 
 
-def speak_phrase(p, lang, names):
+def speak_phrase(p, lang, names, client=False):
     """Say phrase p in lang: native/fluent recording → Piper on the approved text → learner recording →
-    English with a spoken warning. Returns the panel's reply dict."""
+    English with a spoken warning. Returns the panel's reply dict; with client=True it carries
+    "audio": [urls] for the client to play in order instead of the Nano playing them."""
+    out = _speak_phrase(p, lang, names, client)
+    if client:
+        out["audio"] = [serve_audio(w) for w in (out.pop("_wavs", None) or [])]
+    return out
+
+
+def _speak_phrase(p, lang, names, client):
     tr = p["text"] if lang == "en" else p["translations"].get(lang)
     recs = recording_index().get((p["key"], lang), []) if lang != "en" else []
     best = recs[0] if recs else None
     lname = names.get(lang, lang)
     shown = for_panel(tr, lang) or p["text"]
     if best and best[0] <= SPEAKER_RANK["fluent"]:
-        audio.play(best[2])
-        return {"say": shown, "how": "recording", "lang": lang, "file": best[2].name, "note": None}
+        w = audio.play(best[2], client=client)
+        return {"say": shown, "how": "recording", "lang": lang, "file": best[2].name, "note": None, "_wavs": w}
     if tr and has_voice(lang):
-        audio.say(tr, lang)
-        return {"say": shown, "how": "piper" if lang in VOICE else "google", "lang": lang, "note": None}
+        w = audio.say(tr, lang, client=client)
+        return {"say": shown, "how": "piper" if lang in VOICE else "google", "lang": lang, "note": None, "_wavs": w}
     if best:
-        audio.play(best[2])
-        return {"say": shown, "how": "recording", "lang": lang, "file": best[2].name, "note": "learner recording"}
+        w = audio.play(best[2], client=client)
+        return {"say": shown, "how": "recording", "lang": lang, "file": best[2].name, "note": "learner recording", "_wavs": w}
     draft = panel_drafts.get(p, lang)
     if SPEAK_DRAFTS and draft and has_voice(lang) and lang != "en":     # demo: voice the unverified draft
-        audio.say(draft, lang)
+        w = audio.say(draft, lang, client=client)
         return {"say": for_panel(draft, lang), "how": ("piper" if lang in VOICE else "google") + "-draft", "lang": lang,
-                "note": "unverified — machine translation", "draft": for_panel(draft, lang), "offer_record": True}
+                "note": "unverified — machine translation", "draft": for_panel(draft, lang), "offer_record": True, "_wavs": w}
     # English fallback — and say so, so nobody mistakes it for the translation
     if tr:
         warn, note = f"Sorry, I can't say that in {lname} yet.", f"No {lname} voice"
     else:
         warn, note = f"Sorry, I don't have that phrase in {lname} yet.", f"No {lname} version yet"
-    audio.say(warn, "en", then=(p["text"], "en"))
+    w = audio.say(warn, "en", then=(p["text"], "en"), client=client)
     return {"say": shown, "how": "piper", "lang": "en", "note": note, "warning": warn,
-            "offer_record": True, "draft": for_panel(panel_drafts.get(p, lang), lang)}
+            "offer_record": True, "draft": for_panel(panel_drafts.get(p, lang), lang), "_wavs": w}
+
+
+def take_meta(q, lang):
+    """The volunteer/phrase context of a take from the query, or None for a free transcription.
+    Raises ValueError(status, message) when the request is not a valid take."""
+    if not q.get("phrase"):
+        return None
+    phrases, _ = load_phrases()
+    p = phrases.get(q["phrase"])
+    sid = q.get("speaker", "").lower()
+    if not p:
+        raise ValueError(404, f"unknown phrase {q['phrase']}")
+    if q.get("consent") != "1":
+        raise ValueError(409, "Consent not confirmed")
+    if not (2 <= len(sid) <= 12 and sid.isalnum()):
+        raise ValueError(409, "Speaker id: 2–12 letters/digits")
+    if q.get("type", "native") not in ("native", "fluent", "learner", "staff"):
+        raise ValueError(409, "Speaker type?")
+    tr = p["translations"].get(lang)
+    return {"phrase": p, "lang": lang, "speaker": {"id": sid, "type": q.get("type", "native")},
+            "read_text": p["text"] if lang == "en" else tr,
+            "translation_source": "canonical" if lang == "en" else ("approved" if tr else None)}
+
+
+def finish_take(take, meta, q, lang, client=False, device=panel_takes.PANEL_DEVICE):
+    """A finished WAV: file it as a take (meta) or transcribe/translate it (free speech).
+    Returns (status, reply). client=True returns the spoken reply as audio URLs instead of playing it;
+    device is what recorded the WAV (the Nano's mic, or the uploading iPad's user agent)."""
+    if lang in asr_worker.WHISPER_UNSUPPORTED and not (meta and meta.get("phrase")):
+        return 200, {"say": f"Whisper has no {asr_worker.WHISPER_UNSUPPORTED[lang]} model yet — "
+                            "recordings of phrases in it are what will make that possible.", "text": None}
+    raw = q.get("raw") == "1"
+    shape = (lambda t, l: t) if raw else for_panel
+    if meta and meta.get("phrase"):                       # file the take, then draft its text
+        batch_id, rec = panel_takes.file_take(take, meta["started_at_ms"], meta["lang"], meta["speaker"],
+                                              meta["phrase"], meta["read_text"], meta["translation_source"], device)
+        wav = panel_takes.RECORDINGS / batch_id / rec["file"]
+        wl = asr_worker.WHISPER_LANG.get(lang, lang)
+        text = asr_worker.transcribe(WHISPER_MODEL, wl, [wav])[str(wav)]
+        panel_takes.draft_transcript(batch_id, rec, lang, meta["phrase"], text, WHISPER_MODEL)
+        say = f"Take {rec['take']} saved ({rec['duration_ms'] / 1000:.1f} s)"
+        if text and lang != "en":
+            say += f" — draft: {text}"
+        log(f"take filed: {batch_id}/{rec['file']}")
+        return 200, {"say": say, "text": text, "file": rec["file"], "batch": batch_id, "take": rec["take"]}
+    wl = asr_worker.WHISPER_LANG.get(lang, lang)
+    text = asr_worker.transcribe(WHISPER_MODEL, wl, [take])[str(take)]
+    out = {"say": shape(text, lang) or "(nothing heard)", "text": text, "file": take.name}
+    src = q.get("src", "en")
+    if text and lang != src and (llama_up() or panel_drafts.nllb_available()):
+        names = load_phrases()[1]
+        out["translated"] = to_language(text, names.get(lang, lang), names.get(src, "English"), lang, src)
+        out["say"] = f"{shape(text, lang)} → {shape(out['translated'], src)}"
+        if q.get("speak") == "1" and has_voice(src):
+            w = audio.say(out["translated"], src, client=client)
+            if client:
+                out["audio"] = [serve_audio(x) for x in w]
+        panel_drafts.log_turn("patient" if q.get("who") == "patient" else "clinician", kind="speech",
+                              sourceText=text, translatedText=out.get("translated"))
+    elif text and lang != src:
+        out["say"] = f"{text}  (no translator running — NLLB missing and llama-server off)"
+    return 200, out
 
 
 def beacon():
@@ -349,9 +445,49 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(data)
 
+    # ---- who is asking: a paired device, or one of the public paths ----
+    def token(self, q):
+        h = self.headers.get("Authorization", "")
+        return h[7:].strip() if h.startswith("Bearer ") else q.get("token")
+
+    def authed(self, u, q, public):
+        if u.path in public or u.path.startswith("/audio/"):
+            return True
+        if panel_admin.token_ok(self.token(q)):
+            return True
+        self.reply(401, {"error": "not paired", "say": "This device is not paired with the Nano — open /setup"})
+        return False
+
+    def send_file(self, path, ctype=None, cache="no-cache"):
+        data = Path(path).read_bytes()
+        self.send_response(200)
+        self.send_header("Content-Type", ctype or mimetypes.guess_type(str(path))[0] or "application/octet-stream")
+        self.send_header("Content-Length", str(len(data)))
+        self.send_header("Cache-Control", cache)
+        self.end_headers()
+        self.wfile.write(data)
+
     def do_GET(self):
         u = urlparse(self.path)
         q = {k: v[0] for k, v in parse_qs(u.query).items()}
+        if not self.authed(u, q, PUBLIC_GET):
+            return
+        if u.path in ("/", "/index.html", "/setup"):    # the iPad client and its setup/pairing page
+            f = WEB / ("setup.html" if u.path == "/setup" else "index.html")
+            return self.send_file(f, "text/html; charset=utf-8") if f.exists() else self.reply(404, {"error": "web client not deployed"})
+        if u.path in PUBLIC_GET and u.path.count("/") == 1 and "." in u.path and (WEB / u.path[1:]).exists():
+            ctype = {"/sw.js": "application/javascript", "/manifest.webmanifest": "application/manifest+json"}.get(u.path)
+            return self.send_file(WEB / u.path[1:], ctype, cache="no-cache" if u.path.endswith((".js", ".webmanifest")) else "max-age=86400")
+        if u.path == "/ca.crt":                          # the Nano's CA, for the iPad to trust once
+            ca = panel_admin.TLS / "ca.crt"
+            if not ca.exists():
+                return self.reply(404, {"error": "no CA yet — run tools/nano.sh panel"})
+            return self.send_file(ca, "application/x-x509-ca-cert", cache="max-age=3600")
+        if u.path.startswith("/audio/"):                 # WAVs the API told a client to play
+            wav = AUDIO_IDS.get(u.path[len("/audio/"):])
+            if not wav or not wav.exists():
+                return self.reply(404, {"error": "no such audio"})
+            return self.send_file(wav, "audio/wav", cache="max-age=600")
         if u.path == "/pregen":                         # cache Google/Piper audio for a language (background)
             lang = q.get("lang", "")
             threading.Thread(target=pregen, args=(lang,), daemon=True).start()
@@ -372,6 +508,8 @@ class Handler(BaseHTTPRequestHandler):
             return self.reply(200, {"languages": panel_admin.available()})
         if u.path == "/health":
             return self.reply(200, health())
+        if u.path == "/devices":                        # paired devices (names only)
+            return self.reply(200, {"devices": [dict(v, token=t[:6] + "…") for t, v in panel_admin.devices().items()]})
         if u.path == "/phrases":
             d = json.loads(PHRASES.read_text())
             lang, src = q.get("lang", "en"), q.get("src", "en")
@@ -380,18 +518,19 @@ class Handler(BaseHTTPRequestHandler):
             panel_drafts.request(d["phrases"], lang, names.get(lang, lang), up)     # unverified, for display only
             panel_drafts.request(d["phrases"], src, names.get(src, src), up)
             recs = recording_index()
+            shape = (lambda t, l: t) if q.get("raw") == "1" else for_panel
             def slim(p):
                 row = {"key": p["key"], "category": p["category"], "text": p["text"]}
                 if src != "en":
                     if p["translations"].get(src):
-                        row["src_text"] = for_panel(p["translations"][src], src)
+                        row["src_text"] = shape(p["translations"][src], src)
                     elif panel_drafts.get(p, src):
-                        row["src_draft"] = for_panel(panel_drafts.get(p, src), src)
+                        row["src_draft"] = shape(panel_drafts.get(p, src), src)
                 if lang != "en":
                     if p["translations"].get(lang):
-                        row["translation"] = for_panel(p["translations"][lang], lang)
+                        row["translation"] = shape(p["translations"][lang], lang)
                     elif panel_drafts.get(p, lang):
-                        row["draft"] = for_panel(panel_drafts.get(p, lang), lang)
+                        row["draft"] = shape(panel_drafts.get(p, lang), lang)
                 if recs.get((p["key"], lang)):
                     row["recording"] = True
                 return row
@@ -407,11 +546,23 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         u = urlparse(self.path)
         q = {k: v[0] for k, v in parse_qs(u.query).items()}
-        self.rfile.read(int(self.headers.get("Content-Length") or 0))   # panel body is irrelevant
+        length = int(self.headers.get("Content-Length") or 0)
+        if length > MAX_UPLOAD:
+            return self.reply(413, {"say": "That recording is too long"})
+        body = self.rfile.read(length)                   # a WAV for /panel/transcribe; otherwise ignored
+        if not self.authed(u, q, PUBLIC_POST):
+            return
+        if u.path == "/pair":                            # setup page: pairing code → device token
+            token = panel_admin.redeem_pair_code(q.get("code", ""), q.get("name", ""))
+            if not token:
+                return self.reply(403, {"say": "Wrong or expired code — run tools/nano.sh pair for a new one"})
+            log(f"device paired: {q.get('name', 'iPad')!r}")
+            return self.reply(200, {"token": token, "say": "Paired"})
         if not u.path.startswith("/panel/"):
             return self.reply(404, {"error": "no such route"})
         action = u.path[len("/panel/"):]
         lang = q.get("lang", "en")
+        client = q.get("client") == "1"                  # the caller plays audio itself (iPad)
         try:
             if action == "session":
                 sid = panel_drafts.start_session(q.get("src", "en"), q.get("dst", "?"))
@@ -422,7 +573,7 @@ class Handler(BaseHTTPRequestHandler):
                 if not p:
                     return self.reply(404, {"say": "unknown reply"})
                 src = q.get("src", "en")
-                out = speak_phrase(p, src, names)
+                out = speak_phrase(p, src, names, client)
                 out["key"] = p["key"]
                 out["patient_text"] = for_panel(p["translations"].get(lang), lang) or p["text"]
                 panel_drafts.log_turn("patient", kind="preset", key=p["key"], sourceText=out["patient_text"],
@@ -430,8 +581,9 @@ class Handler(BaseHTTPRequestHandler):
                 return self.reply(200, out)
             if action == "phrase":                                    # "Add phrase" page: a new English phrase
                 speaker = {"id": q["speaker"].lower(), "type": q.get("type", "staff")} if q.get("speaker") else None
-                take = WORK / q["file"] if re.fullmatch(r"\d{8}T\d{6}Z_take\.wav", q.get("file", "")) else None
-                code, out = panel_admin.add_phrase(q.get("text"), q.get("category", ""), PHRASES, speaker, take)
+                take = WORK / q["file"] if re.fullmatch(r"\d{8}T\d{6}Z(_\d+)?_take\.wav", q.get("file", "")) else None
+                device = panel_takes.PANEL_DEVICE if q.get("device") == "panel" else (self.headers.get("User-Agent") or "unknown client")[:200] + " via PhraseKit web"
+                code, out = panel_admin.add_phrase(q.get("text"), q.get("category", ""), PHRASES, speaker, take, device)
                 if code == 200:
                     log(f"phrase added from the panel: {out['key']} [{q.get('category')}] {q.get('text')!r}")
                     panel_drafts.log_turn("system", kind="phrase_added", key=out["key"], sourceText=q.get("text"))
@@ -444,26 +596,16 @@ class Handler(BaseHTTPRequestHandler):
             if action == "shutdown":
                 log("shutdown requested by the panel")
                 self.reply(200, {"say": "Shutting down"})
-                subprocess.Popen(["sudo", "-n", "shutdown", "-h", "+0"])       # passwordless via /etc/sudoers.d/gadgetboy-power
+                if RUNTIME.is_dir():                                          # sandboxed: a root path unit watches for this
+                    (RUNTIME / "shutdown").touch()
+                else:
+                    subprocess.Popen(["sudo", "-n", "shutdown", "-h", "+0"])  # passwordless via /etc/sudoers.d/gadgetboy-power
                 return
-            if action == "record":
-                meta = None
-                if q.get("phrase"):                                   # a volunteer take of a phrase
-                    phrases, _ = load_phrases()
-                    p = phrases.get(q["phrase"])
-                    sid = q.get("speaker", "").lower()
-                    if not p:
-                        return self.reply(404, {"say": f"unknown phrase {q['phrase']}"})
-                    if q.get("consent") != "1":
-                        return self.reply(409, {"say": "Consent not confirmed"})
-                    if not (2 <= len(sid) <= 12 and sid.isalnum()):
-                        return self.reply(409, {"say": "Speaker id: 2–12 letters/digits"})
-                    if q.get("type", "native") not in ("native", "fluent", "learner", "staff"):
-                        return self.reply(409, {"say": "Speaker type?"})
-                    tr = p["translations"].get(lang)
-                    meta = {"phrase": p, "lang": lang, "speaker": {"id": sid, "type": q.get("type", "native")},
-                            "read_text": p["text"] if lang == "en" else tr,
-                            "translation_source": "canonical" if lang == "en" else ("approved" if tr else None)}
+            if action == "record":                                    # the Nano's own mic
+                try:
+                    meta = take_meta(q, lang)
+                except ValueError as e:
+                    return self.reply(e.args[0], {"say": e.args[1]})
                 take = audio.record(meta)
                 say = "Recording… tap Stop" if not meta else "Read it aloud, then tap Stop"
                 return self.reply(200, {"say": say, "file": take.name, "read_text": meta and meta["read_text"]})
@@ -471,41 +613,29 @@ class Handler(BaseHTTPRequestHandler):
                 take, meta = audio.stop()
                 if not take:
                     return self.reply(409, {"say": "Not recording"})
-                if lang in asr_worker.WHISPER_UNSUPPORTED and not (meta and meta.get("phrase")):
-                    return self.reply(200, {"say": f"Whisper has no {asr_worker.WHISPER_UNSUPPORTED[lang]} model yet — "
-                                                   "recordings of phrases in it are what will make that possible.", "text": None})
-                if meta and meta.get("phrase"):                       # file the take, then draft its text
-                    batch_id, rec = panel_takes.file_take(take, meta["started_at_ms"], meta["lang"], meta["speaker"],
-                                                          meta["phrase"], meta["read_text"], meta["translation_source"])
-                    wav = panel_takes.RECORDINGS / batch_id / rec["file"]
-                    wl = asr_worker.WHISPER_LANG.get(lang, lang)
-                    text = asr_worker.transcribe(WHISPER_MODEL, wl, [wav])[str(wav)]
-                    panel_takes.draft_transcript(batch_id, rec, lang, meta["phrase"], text, WHISPER_MODEL)
-                    say = f"Take {rec['take']} saved ({rec['duration_ms'] / 1000:.1f} s)"
-                    if text and lang != "en":
-                        say += f" — draft: {text}"
-                    log(f"take filed: {batch_id}/{rec['file']}")
-                    return self.reply(200, {"say": say, "text": text, "file": rec["file"], "batch": batch_id, "take": rec["take"]})
-                wl = asr_worker.WHISPER_LANG.get(lang, lang)
-                text = asr_worker.transcribe(WHISPER_MODEL, wl, [take])[str(take)]
-                out = {"say": for_panel(text, lang) or "(nothing heard)", "text": text, "file": take.name}
-                src = q.get("src", "en")
-                if text and lang != src and (llama_up() or panel_drafts.nllb_available()):
-                    names = load_phrases()[1]
-                    out["translated"] = to_language(text, names.get(lang, lang), names.get(src, "English"), lang, src)
-                    out["say"] = f"{for_panel(text, lang)} → {for_panel(out['translated'], src)}"
-                    if q.get("speak") == "1" and has_voice(src):
-                        audio.say(out["translated"], src)
-                    panel_drafts.log_turn("patient" if q.get("who") == "patient" else "clinician", kind="speech",
-                                          sourceText=text, translatedText=out.get("translated"))
-                elif text and lang != src:
-                    out["say"] = f"{text}  (no translator running — NLLB missing and llama-server off)"
-                return self.reply(200, out)
+                return self.reply(*finish_take(take, meta, q, lang, client))
+            if action == "transcribe":                                # a WAV recorded by the client (iPad mic)
+                if len(body) < 1000 or body[:4] != b"RIFF" or body[8:12] != b"WAVE":
+                    return self.reply(400, {"say": "Send a WAV file as the request body"})
+                try:
+                    meta = take_meta(q, lang)
+                except ValueError as e:
+                    return self.reply(e.args[0], {"say": e.args[1]})
+                WORK.mkdir(parents=True, exist_ok=True)
+                take = WORK / time.strftime("%Y%m%dT%H%M%SZ_take.wav", time.gmtime())
+                n = 0
+                while take.exists():                                  # two uploads in the same second
+                    n += 1; take = WORK / time.strftime(f"%Y%m%dT%H%M%SZ_{n}_take.wav", time.gmtime())
+                take.write_bytes(body)
+                if meta:
+                    meta["started_at_ms"] = int(q.get("started", 0)) or int(time.time() * 1000)
+                device = (self.headers.get("User-Agent") or "unknown client")[:200] + " via PhraseKit web"
+                return self.reply(*finish_take(take, meta, q, lang, client, device))
             phrases, names = load_phrases()
             p = phrases.get(action)
             if not p:
                 return self.reply(404, {"say": f"unknown phrase {action}"})
-            out = speak_phrase(p, lang, names)
+            out = speak_phrase(p, lang, names, client)
             out["key"] = p["key"]
             src = q.get("src", "en")
             out["src_text"] = p["text"] if src == "en" else (p["translations"].get(src) or p["text"])
@@ -523,5 +653,14 @@ class Handler(BaseHTTPRequestHandler):
 
 if __name__ == "__main__":
     threading.Thread(target=beacon, daemon=True).start()
-    log(f"panel api on :{PORT}", json.dumps(health()))
+    if not panel_admin.devices():
+        log("WARNING: no paired devices (~/panel/devices.json) — every non-public request will get 401; run tools/nano.sh panel")
+    tls = panel_admin.tls_ensure()
+    if tls:                                                           # HTTPS twin for iPads (mic needs a secure origin)
+        ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+        ctx.load_cert_chain(str(tls[0]), str(tls[1]))
+        https = ThreadingHTTPServer(("0.0.0.0", TLS_PORT), Handler)
+        https.socket = ctx.wrap_socket(https.socket, server_side=True)
+        threading.Thread(target=https.serve_forever, daemon=True).start()
+    log(f"panel api on :{PORT}" + (f" and https :{TLS_PORT}" if tls else ""), json.dumps(health()))
     ThreadingHTTPServer(("0.0.0.0", PORT), Handler).serve_forever()

@@ -6,9 +6,11 @@ push.py's build_insert so there is one definition of that INSERT. After the row 
 whisper-cli drafts the transcript into golden_set as 'draft' (created_by whisper:<model>),
 exactly as tools/draft_transcripts.py does for pushed batches. Nothing is ever approved here.
 
-One batch per (speaker, language) while the API runs: one speaker, one language, one session.
+One batch per (speaker, language, device) while the API runs: one speaker, one language, one session.
+The device is the Nano's USB mic (the Waveshare flow) or whatever an iPad sent with its upload.
 """
 import hashlib
+import struct
 import json
 import random
 import string
@@ -24,18 +26,36 @@ APP_VERSION = "panel-1.0"
 CONSENT_TEXT_VERSION = 1          # the statement the panel shows == public/index.html's CONSENT_TEXT
 SAMPLE_RATE = 48000
 
-_batches = {}                     # (speaker_id, lang) -> batch dir
+PANEL_DEVICE = "phrase-panel/ESP32-S3-Touch-LCD-7 + Nano USB mic"
+_batches = {}                     # (speaker_id, lang, device) -> batch dir
 
 
-def batch_dir(speaker_id, lang):
-    key = (speaker_id, lang)
+def wav_format(data):
+    """(sample_rate, channels, bits, data_bytes) from a RIFF/WAVE header; the contract wants the real rate."""
+    rate, channels, bits, size = SAMPLE_RATE, 1, 16, max(0, len(data) - 44)
+    if data[:4] == b"RIFF" and data[8:12] == b"WAVE":
+        pos = 12
+        while pos + 8 <= len(data):
+            cid, clen = data[pos:pos + 4], struct.unpack("<I", data[pos + 4:pos + 8])[0]
+            if cid == b"fmt " and clen >= 16:
+                channels, rate = struct.unpack("<HI", data[pos + 10:pos + 16])
+                bits = struct.unpack("<H", data[pos + 22:pos + 24])[0]
+            elif cid == b"data":
+                size = min(clen, len(data) - pos - 8)
+                break
+            pos += 8 + clen + (clen & 1)
+    return rate, channels, bits, size
+
+
+def batch_dir(speaker_id, lang, device=PANEL_DEVICE):
+    key = (speaker_id, lang, device)
     if key not in _batches:
         rand = "".join(random.choices(string.ascii_lowercase + string.digits, k=6))
         _batches[key] = RECORDINGS / f"{time.strftime('%Y%m%dT%H%M%SZ', time.gmtime())}_{speaker_id}_{lang}_{rand}"
     return _batches[key]
 
 
-def _manifest(d, lang, speaker):
+def _manifest(d, lang, speaker, device=PANEL_DEVICE):
     mf = d / "manifest.json"
     if mf.exists():
         return json.loads(mf.read_text())
@@ -44,28 +64,31 @@ def _manifest(d, lang, speaker):
         "exported_at": None, "language": lang,
         "speaker": {"id": speaker["id"], "type": speaker["type"],
                     "consent_confirmed": True, "consent_text_version": CONSENT_TEXT_VERSION},
-        "device": {"user_agent": "phrase-panel/ESP32-S3-Touch-LCD-7 + Nano USB mic", "sample_rate": SAMPLE_RATE},
+        "device": {"user_agent": device, "sample_rate": None},          # filled from the first take's WAV
         "recordings": [],
     }
 
 
-def file_take(tmp_wav, started_at_ms, lang, speaker, phrase, read_text, translation_source):
+def file_take(tmp_wav, started_at_ms, lang, speaker, phrase, read_text, translation_source, device=PANEL_DEVICE):
     """Move a finished take into its batch, extend the manifest, insert the audio_samples row.
     Returns (batch_id, recording dict)."""
-    d = batch_dir(speaker["id"], lang)
+    d = batch_dir(speaker["id"], lang, device)
     d.mkdir(parents=True, exist_ok=True)
-    m = _manifest(d, lang, speaker)
+    m = _manifest(d, lang, speaker, device)
     take = 1 + sum(1 for r in m["recordings"] if r["phrase_key"] == phrase["key"])
     name = f"{phrase['key']}v{phrase['version']}_{lang}_{phrase['category']}_asr_training_{speaker['id']}_t{take}_{started_at_ms}.wav"
     wav = d / name
     tmp_wav.rename(wav)
     data = wav.read_bytes()
+    rate, channels, bits, size = wav_format(data)
+    if m["device"].get("sample_rate") is None:
+        m["device"]["sample_rate"] = rate
     rec = {
         "file": name, "phrase_key": phrase["key"], "phrase_version": phrase["version"],
         "phrase_text": phrase["text"], "unmatched": False, "category": phrase["category"],
         "purpose": "asr_training", "take": take,
         "read_text": read_text, "translation_source": translation_source,
-        "sample_rate": SAMPLE_RATE, "duration_ms": int((len(data) - 44) / (SAMPLE_RATE * 2) * 1000),
+        "sample_rate": rate, "duration_ms": int(size / (rate * channels * (bits // 8)) * 1000),
         "bytes": len(data), "sha256": hashlib.sha256(data).hexdigest(),
         "recorded_at": time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime(started_at_ms / 1000)) + f".{started_at_ms % 1000:03d}Z",
     }

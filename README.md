@@ -116,6 +116,23 @@ list`, listen with `play <id>`, then `approve <id>`, then
 reads the same approved text. A blank box never stores the English as the
 translation; the recording is kept and the text can be added later.
 
+## iPad client (`nano/web/`)
+
+The Nano serves the same six screens as a web app at `http://<nano>:8765/` and
+`https://<nano>:8766/` (the Waveshare and the iPad share one API). The iPad's
+own mic and speaker are used, so the Nano can sit in a bag on its hotspot.
+One-time per iPad: open `/setup` — install the Nano's CA (`/ca.crt`, then
+Certificate Trust Settings), pair with a code from `tools/nano.sh pair`, add
+to the Home Screen. Every API call carries a device token (`devices.json` on
+the Nano; `tools/nano.sh devices|revoke`); the Waveshare's is `panel_token`
+in `nano/secrets.yaml`. Audio comes back as `/audio/<id>` URLs (`client=1`),
+speech goes up as a WAV to `POST /panel/transcribe`. Needs iPadOS 13.4+.
+
+`tools/nano.sh install` (once, asks for the Nano's sudo password) turns the
+API into a sandboxed systemd service, adds the shutdown path unit, and
+installs `phrasekit-internet on|off` — an nftables rule that blocks every
+route off the local network during a consult (`tools/nano.sh internet off`).
+
 ## Deploy
 
 Cloudflare Pages project `phrase-recorder`, connected to this repo. Push to

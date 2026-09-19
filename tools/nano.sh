@@ -2,7 +2,8 @@
 # Day-to-day menu for the Nano, from the Mac.
 #
 #   tools/nano.sh            # interactive menu
-#   tools/nano.sh status     # or any item by name: status start panel hotspot fonts test ingest push bench translations backup reboot shutdown
+#   tools/nano.sh status     # or any item by name: status start panel install pair devices revoke internet hotspot fonts test
+#                            #                       ingest push bench translations backup reboot shutdown
 #
 # Sets the env the other tools need (NANO_SSH, NANO_DEST, PG_DSN, libpq on PATH)
 # so nothing has to be exported by hand. Password for Postgres comes from ~/.pgpass.
@@ -48,9 +49,19 @@ panel() {
   # The panel can add phrases and languages itself now, so Postgres may be ahead of public/phrases.json:
   # export first, so the copy we ship (and commit) is the database, never an older file over a newer one.
   python3 tools/export_phrases.py || { echo "export_phrases failed — not deploying a possibly stale phrases.json"; return 1; }
-  ssh "$NANO_SSH" 'mkdir -p ~/panel'
+  ssh "$NANO_SSH" 'mkdir -p ~/panel/web'
   scp -q nano/panel_api.py nano/panel_takes.py nano/panel_drafts.py nano/panel_render.py nano/panel_admin.py nano/asr_worker.py \
          tools/push.py tools/export_phrases.py public/phrases.json "$NANO_SSH:panel/"
+  scp -q nano/web/* "$NANO_SSH:panel/web/"
+  # The Waveshare's device token (nano/secrets.yaml) is registered as a paired device, and the Nano's own CA +
+  # server certificate are (re)issued so iPads can use https://…:8766 — see nano/panel_admin.py.
+  tok=$(sed -n 's/^panel_token: *"\(.*\)".*/\1/p' nano/secrets.yaml 2>/dev/null)
+  if [ -n "$tok" ] && [ "$tok" != "REPLACE" ]; then
+    ssh "$NANO_SSH" "cd ~/panel && python3 -c \"import panel_admin; panel_admin.ensure_device('$tok', 'waveshare', 'panel')\""
+  else
+    echo "warning: no panel_token in nano/secrets.yaml — the Waveshare will get 401 from the API"
+  fi
+  ssh "$NANO_SSH" 'cd ~/panel && python3 panel_admin.py tls'
   # The API files volunteer takes into Postgres itself, so the Nano needs the app password: reuse the
   # Mac's ~/.pgpass entry as a localhost line (mode 600). Skipped, with a warning, if the Mac has none.
   pw=$(awk -F: -v h="$HOST" '$1 == h && $3 == "interpreter_data" && $4 == "interpreter_app" {print $5; exit}' ~/.pgpass 2>/dev/null)
@@ -60,12 +71,16 @@ panel() {
     echo "warning: no ~/.pgpass entry for $HOST/interpreter_data on the Mac — panel takes will not reach Postgres"
   fi
   ssh "$NANO_SSH" '
-    (crontab -l 2>/dev/null | grep -v -e panel_api.py -e llama-server
-     echo "@reboot sleep 15 && python3 \$HOME/panel/panel_api.py >>\$HOME/panel/panel.log 2>&1"
-     echo "@reboot sleep 20 && cd \$HOME/llama.cpp && ./build/bin/llama-server -m \$HOME/models/Qwen2.5-3B-Instruct-Q4_K_M.gguf -ngl 99 -c 2048 --port 8080 --host 127.0.0.1 >>\$HOME/llama-server.log 2>&1") | crontab -
-    pkill -f "^python3 .*panel_api.py"; sleep 1   # anchored so it cannot match this very shell
-    cd ~/panel && setsid -f python3 panel_api.py >>panel.log 2>&1 </dev/null
-    for i in $(seq 1 10); do curl -s -m 1 localhost:8765/health && { echo; echo "panel api up (${i}s)"; exit 0; }; sleep 1; done
+    if systemctl list-unit-files phrase-panel.service >/dev/null 2>&1 && [ -f /etc/systemd/system/phrase-panel.service ]; then
+      sudo -n systemctl restart phrase-panel 2>/dev/null || systemctl restart phrase-panel 2>/dev/null || { echo "restart needs: tools/nano.sh install (once)"; }
+    else                                   # not installed as a service yet (tools/nano.sh install): the old way
+      (crontab -l 2>/dev/null | grep -v -e panel_api.py -e llama-server
+       echo "@reboot sleep 15 && python3 \$HOME/panel/panel_api.py >>\$HOME/panel/panel.log 2>&1"
+       echo "@reboot sleep 20 && cd \$HOME/llama.cpp && ./build/bin/llama-server -m \$HOME/models/Qwen2.5-3B-Instruct-Q4_K_M.gguf -ngl 99 -c 2048 --port 8080 --host 127.0.0.1 >>\$HOME/llama-server.log 2>&1") | crontab -
+      pkill -f "^python3 .*panel_api.py"; sleep 1   # anchored so it cannot match this very shell
+      cd ~/panel && setsid -f python3 panel_api.py >>panel.log 2>&1 </dev/null
+    fi
+    for i in $(seq 1 15); do curl -s -m 1 localhost:8765/health && { echo; echo "panel api up (${i}s)"; exit 0; }; sleep 1; done
     echo "panel api did not come up — see ~/panel/panel.log on the Nano"; tail -5 ~/panel/panel.log
   '
 }
@@ -94,6 +109,16 @@ hotspot() {
     *) echo "usage: tools/nano.sh hotspot [on|off|status]"; return 2 ;;
   esac
 }
+
+# One-time root setup on the Nano: sandboxed systemd services, shutdown path unit, internet on/off rule.
+# Asks for your password on the Nano (nano/install.sh explains each piece).
+install()      { need_up && scp -q nano/install.sh "$NANO_SSH:panel/install.sh" && ssh -t "$NANO_SSH" 'sudo bash ~/panel/install.sh'; }
+# iPad pairing: prints a 10-minute code; on the iPad open the setup page it names and type the code.
+pair()         { need_up && ssh "$NANO_SSH" 'cd ~/panel && python3 panel_admin.py pair'; }
+devices()      { need_up && ssh "$NANO_SSH" 'cd ~/panel && python3 panel_admin.py devices'; }
+revoke()       { need_up && ssh "$NANO_SSH" "cd ~/panel && python3 panel_admin.py revoke '$1'"; }
+# internet off = provably nothing leaves the Nano or its hotspot during a consult (nftables; see install.sh)
+internet()     { need_up && ssh "$NANO_SSH" "sudo -n /usr/local/sbin/phrasekit-internet ${1:-status}"; }
 
 # Every Noto font the language table (nano/panel_admin.py) can need, into ~/panel/fonts — do this at home,
 # once, so "Add a language" on the panel never has to reach the internet at a demo.
@@ -124,7 +149,10 @@ menu() {
   t) test          regression tests: panel fonts vs texts, Nano API per language, panel liveness
   h) hotspot       on|off|status — the Nano's PhraseKit Wi-Fi hotspot for demos
   f) fonts         fetch every Noto font "Add a language" could need (needs internet, once)
-  r) reboot        restart the Nano (services return by cron)
+  i) install       one-time root setup on the Nano: sandboxed services, shutdown unit, internet switch
+  a) pair          pairing code for an iPad (devices / revoke <name> to list / remove)
+  n) internet      on|off|status — block every route off the local network during a consult
+  r) reboot        restart the Nano (services come back on their own)
   3) ingest        validate zips/WAVs in ~/Downloads → staged/
   4) push          staged batches → Nano
   5) bench         score Whisper + Qwen against the golden set
@@ -136,7 +164,8 @@ EOF
     read -r -p "> " c
     case "$c" in
       1|status) status ;; 2|start) start ;; p|panel) panel ;; t|test) test ;; h|hotspot) read -r -p "on/off/status? " m; hotspot "$m" ;; 3|ingest) ingest ;; 4|push) push ;;
-      f|fonts) fonts ;; r|reboot) reboot_nano ;;
+      f|fonts) fonts ;; r|reboot) reboot_nano ;; i|install) install ;; a|pair) pair ;;
+      n|internet) read -r -p "on/off/status? " m; internet "$m" ;;
       5|bench) bench ;; 6|translations) translations ;; 7|backup) backup ;;
       8|shutdown) shutdown_nano ;; q|quit|"") break ;;
       *) echo "?" ;;
@@ -146,8 +175,8 @@ EOF
 
 case "${1:-}" in
   "") menu ;;
-  status|start|panel|hotspot|fonts|test|ingest|push|bench|translations|backup) f="$1"; shift; "$f" "$@" ;;
+  status|start|panel|hotspot|fonts|test|ingest|push|bench|translations|backup|install|pair|devices|revoke|internet) f="$1"; shift; "$f" "$@" ;;
   shutdown) shutdown_nano ;;
   reboot) reboot_nano ;;
-  *) echo "usage: tools/nano.sh [status|start|panel|hotspot|fonts|ingest|push|bench|translations|backup|reboot|shutdown]"; exit 2 ;;
+  *) echo "usage: tools/nano.sh [status|start|panel|install|pair|devices|revoke|internet|hotspot|fonts|test|ingest|push|bench|translations|backup|reboot|shutdown]"; exit 2 ;;
 esac

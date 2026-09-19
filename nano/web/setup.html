@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>PhraseKit setup</title>
+<style>
+  :root { --base:#F6F4EF; --panel:#fff; --ink:#1B2621; --muted:#6B7F9E; --sage:#4A7A68; --steel:#6B7F9E; --amber:#B8843C; --line:#DDD8CE; }
+  body { margin:0; background:var(--base); color:var(--ink); font:17px/1.45 -apple-system, "Inter", system-ui, sans-serif; }
+  main { max-width:640px; margin:0 auto; padding:24px 16px 48px; }
+  h1 { font-size:26px; margin:0 0 6px; color:var(--sage); }
+  .sub { color:var(--muted); margin:0 0 22px; }
+  .step { background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:16px 18px; margin:0 0 14px; }
+  .step h2 { font-size:18px; margin:0 0 8px; }
+  .step.done h2::after { content:"  ✓"; color:var(--sage); }
+  .step.off { opacity:.55; }
+  ol { padding-left:22px; margin:8px 0; } li { margin:4px 0; }
+  code { background:#EEE9DF; padding:1px 6px; border-radius:6px; font-size:15px; }
+  input { font:inherit; font-size:22px; letter-spacing:.2em; padding:10px 12px; border:1px solid var(--line); border-radius:10px; width:100%; box-sizing:border-box; margin:6px 0 10px; }
+  input.name { letter-spacing:0; font-size:18px; }
+  button, a.btn { display:inline-block; font:inherit; font-weight:600; padding:12px 18px; border-radius:12px; border:0; background:var(--sage); color:#fff; text-decoration:none; }
+  button.secondary, a.secondary { background:#EEE9DF; color:var(--ink); }
+  button:disabled { opacity:.5; }
+  .msg { margin-top:10px; color:var(--amber); min-height:1.4em; }
+  .ok { color:var(--sage); }
+</style>
+</head>
+<body>
+<main>
+  <h1>PhraseKit on this iPad</h1>
+  <p class="sub">Three one-time steps. After this, PhraseKit opens from its icon like an app and talks only to the Nano on this Wi-Fi.</p>
+
+  <section class="step" id="s1">
+    <h2>1. Trust the Nano</h2>
+    <p>The Nano signs its own connection so Safari will allow the microphone. Install its certificate once:</p>
+    <ol>
+      <li><a class="btn" id="calink" href="/ca.crt" download="PhraseKit-Nano-CA.crt">Download certificate</a> — Safari says “profile downloaded”.</li>
+      <li>Settings → <b>Profile Downloaded</b> → Install.</li>
+      <li>Settings → General → About → <b>Certificate Trust Settings</b> → turn on <b>PhraseKit Nano CA</b>.</li>
+    </ol>
+    <p id="s1msg" class="msg"></p>
+  </section>
+
+  <section class="step" id="s2">
+    <h2>2. Pair this iPad</h2>
+    <p>Ask for a pairing code (<code>tools/nano.sh pair</code> on the Mac prints one; it lasts 10 minutes).</p>
+    <label>Pairing code<input id="code" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="000000" autocomplete="one-time-code"></label>
+    <label>Name this iPad<input id="name" class="name" placeholder="e.g. Room 2 iPad" maxlength="40"></label>
+    <button id="pair">Pair</button>
+    <p id="s2msg" class="msg"></p>
+  </section>
+
+  <section class="step" id="s3">
+    <h2>3. Put it on the Home Screen</h2>
+    <p>Share <span style="font-size:20px">⎋</span> → <b>Add to Home Screen</b>. Then set Settings → Display &amp; Brightness → Auto-Lock to <b>Never</b> while in use, and (optionally) Accessibility → Guided Access to keep a patient inside the app.</p>
+    <a class="btn" id="open" href="/">Open PhraseKit</a>
+  </section>
+</main>
+<script>
+(function () {
+  const https = location.protocol === "https:";
+  const host = location.hostname;
+  const s1 = document.getElementById("s1"), s2 = document.getElementById("s2"), s3 = document.getElementById("s3");
+  const s1msg = document.getElementById("s1msg"), s2msg = document.getElementById("s2msg");
+  let token = null;
+  try { token = localStorage.getItem("pk_token"); } catch (e) {}
+
+  if (https) {                       // arriving over https means the certificate is trusted: step 1 is done
+    s1.classList.add("done"); s1msg.textContent = "Trusted — this page is loading securely."; s1msg.className = "msg ok";
+  } else {
+    s2.classList.add("off"); s3.classList.add("off");
+    s1msg.innerHTML = "After step 3 of the certificate, open <code>https://" + host + ":8766/setup</code> to carry on.";
+    document.getElementById("pair").disabled = true;
+  }
+  if (token) { s2.classList.add("done"); s2msg.textContent = "This iPad is paired."; s2msg.className = "msg ok"; }
+
+  document.getElementById("pair").addEventListener("click", async () => {
+    const code = document.getElementById("code").value.trim(), name = document.getElementById("name").value.trim();
+    if (code.length !== 6) { s2msg.textContent = "Six digits, please."; return; }
+    s2msg.className = "msg"; s2msg.textContent = "Pairing…";
+    try {
+      const r = await fetch("/pair?code=" + encodeURIComponent(code) + "&name=" + encodeURIComponent(name || "iPad"), { method: "POST" });
+      const j = await r.json();
+      if (!r.ok || !j.token) { s2msg.textContent = j.say || "Pairing failed."; return; }
+      try { localStorage.setItem("pk_token", j.token); localStorage.setItem("pk_name", name || "iPad"); } catch (e) {}
+      s2.classList.add("done"); s2msg.textContent = "Paired as “" + (name || "iPad") + "”."; s2msg.className = "msg ok";
+    } catch (e) { s2msg.textContent = "Could not reach the Nano: " + e.message; }
+  });
+})();
+</script>
+</body>
+</html>

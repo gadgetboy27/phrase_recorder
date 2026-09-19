@@ -21,6 +21,9 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 NANO = "http://192.168.68.111:8765"
+NANO_TLS = "https://192.168.68.111:8766"
+TOKEN = re.search(r'^panel_token: *"([^"]+)"', (REPO / "nano" / "secrets.yaml").read_text(), re.M).group(1) \
+        if (REPO / "nano" / "secrets.yaml").exists() else ""       # the Waveshare's device token: the API needs one
 PANEL = "192.168.68.113"
 LATIN = {"en", "mi", "es", "vi", "tl", "sm", "to"}
 ARABIC = {"ar", "fa", "prs"}
@@ -35,15 +38,29 @@ def fail(msg):
     print("  FAIL", msg)
 
 
-def get(path, timeout=30):
-    with urllib.request.urlopen(NANO + path, timeout=timeout) as r:
+def _req(path, data=None, method="GET", base=NANO, token=TOKEN, ctx=None, headers=None):
+    req = urllib.request.Request(base + path, data=data, method=method, headers=dict(headers or {}))
+    if token:
+        req.add_header("Authorization", "Bearer " + token)
+    return urllib.request.urlopen(req, timeout=60, context=ctx)
+
+
+def get(path, **kw):
+    with _req(path, **kw) as r:
         return json.loads(r.read())
 
 
-def post(path, timeout=30):
-    req = urllib.request.Request(NANO + path, data=b"", method="POST")
-    with urllib.request.urlopen(req, timeout=timeout) as r:
+def post(path, data=b"", **kw):
+    with _req(path, data, "POST", **kw) as r:
         return json.loads(r.read())
+
+
+def status_of(path, method="GET", **kw):
+    try:
+        with _req(path, b"" if method == "POST" else None, method, **kw) as r:
+            return r.status
+    except urllib.error.HTTPError as e:
+        return e.code
 
 
 # ---- 1. glyph coverage ------------------------------------------------------------------------
@@ -138,6 +155,44 @@ def test_api():
         if resp.headers.get("Content-Type") != "image/png" or len(resp.read()) < 500:
             fail("render endpoint did not return a PNG")
     print(f"  {len(langs)} languages exercised")
+    test_client_paths()
+
+
+def test_client_paths():
+    """What the iPad client relies on: the device-token gate, HTTPS signed by the Nano's own CA, audio
+    returned as URLs, and a WAV upload transcribed + translated (nano/web/index.html, nano/panel_admin.py)."""
+    import ssl, struct, math
+    if status_of("/phrases?lang=en", token="") != 401 or status_of("/panel/p003?lang=en", "POST", token="") != 401:
+        fail("auth: requests without a device token were not refused")
+    if status_of("/phrases?lang=en", token="not-a-token") != 401:
+        fail("auth: a wrong device token was accepted")
+    for path in ("/", "/setup", "/manifest.webmanifest", "/sw.js", "/icon-192.png", "/ca.crt"):
+        if status_of(path, token="") != 200:
+            fail(f"web client: {path} not served")
+    ca = ssl.create_default_context()
+    with _req("/ca.crt", token="") as r:
+        ca.load_verify_locations(cadata=r.read().decode())
+    try:
+        if get("/health", base=NANO_TLS, ctx=ca).get("audio") is None:
+            fail("https: health over TLS malformed")
+    except Exception as e:
+        fail(f"https: {e}")
+    r = post("/panel/p003?lang=hi&src=en&client=1")
+    if not r.get("audio"):
+        fail(f"client=1: no audio URLs in {r}")
+    else:
+        with _req(r["audio"][0], token="") as a:
+            if a.headers.get("Content-Type") != "audio/wav" or len(a.read()) < 1000:
+                fail("client=1: audio URL did not return a WAV")
+    rate, secs = 16000, 1.0                          # a 440 Hz tone: Whisper hears nothing, the path is exercised
+    pcm = b"".join(struct.pack("<h", int(8000 * math.sin(2 * math.pi * 440 * i / rate))) for i in range(int(rate * secs)))
+    wav = b"RIFF" + struct.pack("<I", 36 + len(pcm)) + b"WAVEfmt " + struct.pack("<IHHIIHH", 16, 1, 1, rate, rate * 2, 2, 16) + b"data" + struct.pack("<I", len(pcm)) + pcm
+    r = post("/panel/transcribe?lang=en&src=hi&who=patient&speak=1&client=1&raw=1", wav, headers={"Content-Type": "audio/wav"})
+    if "text" not in r:
+        fail(f"transcribe upload: {r}")
+    if status_of("/panel/transcribe?lang=en", "POST") != 400:
+        fail("transcribe: an empty body was not rejected")
+    print("  client paths: token gate, https via Nano CA, audio URLs, WAV upload")
 
 
 # ---- 3. panel liveness ------------------------------------------------------------------------
