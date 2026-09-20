@@ -20,7 +20,7 @@ import urllib.request
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
-NANO = "http://192.168.68.111:8765"
+NANO = __import__("os").environ.get("NANO_URL", "http://192.168.68.111:8765")
 NANO_TLS = "https://192.168.68.111:8766"
 TOKEN = re.search(r'^panel_token: *"([^"]+)"', (REPO / "nano" / "secrets.yaml").read_text(), re.M).group(1) \
         if (REPO / "nano" / "secrets.yaml").exists() else ""       # the Waveshare's device token: the API needs one
@@ -110,7 +110,10 @@ def test_glyphs():
                 t = p.get(field)
                 if not t:
                     continue
-                want = latin if lang in LATIN or field == "text" else (latin | arabic)
+                # set_text_any() draws a string that contains any Arabic letter with the Arabic font alone, so
+                # every character in it must be in that font — a character only Inter has draws as a box
+                is_ar = any(0x0600 <= ord(c) <= 0x06FF or 0xFB50 <= ord(c) <= 0xFEFF for c in t)   # = panel_helpers.h has_arabic()
+                want = latin if lang in LATIN or field == "text" else (arabic if is_ar else latin)
                 missing = sorted({c for c in t if ord(c) > 31 and ord(c) not in want and c not in "\n"})
                 checked += 1
                 if missing:
