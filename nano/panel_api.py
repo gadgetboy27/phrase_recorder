@@ -409,6 +409,16 @@ def finish_take(take, meta, q, lang, client=False, device=panel_takes.PANEL_DEVI
                               sourceText=text, translatedText=out.get("translated"))
     elif text and lang != src:
         out["say"] = f"{text}  (no translator running — NLLB missing and llama-server off)"
+    if q.get("keep") == "1" and text:                                  # demo/training session: keep the reply
+        sid = q.get("speaker", "").lower()
+        if 2 <= len(sid) <= 12 and sid.isalnum() and q.get("consent") == "1":
+            try:
+                batch_id, rec = panel_takes.file_reply(take, int(q.get("started", 0)) or int(time.time() * 1000), lang,
+                                                       {"id": sid, "type": q.get("type", "staff")}, text, device)
+                out["kept"] = f"{batch_id}/{rec['file']}"
+                log(f"reply kept: {out['kept']}")
+            except Exception as e:
+                log("keep reply failed:", repr(e))
     return 200, out
 
 

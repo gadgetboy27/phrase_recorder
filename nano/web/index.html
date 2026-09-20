@@ -205,6 +205,8 @@
       <h3 style="margin:6px 0 0; font-size:17px; color:var(--muted); font-weight:600">This iPad</h3>
       <div class="muted small" id="pairInfo"></div>
       <div class="row"><button class="primary" id="testSound">Test sound</button><span class="muted small grow" id="testMsg"></span></div>
+      <h3 style="margin:10px 0 0; font-size:17px; color:var(--muted); font-weight:600">Demo / training session</h3>
+      <label class="row" style="align-items:flex-start; gap:10px"><input type="checkbox" id="keepReplies" style="width:22px;height:22px;margin-top:2px"><span class="small">Keep this session's spoken replies as recordings (filed as <code>UNASSIGNED</code> test takes for review and scoring). <b>Only for demo or training sessions with staff or volunteers — never a real patient.</b> Off again when the app is closed.</span></label>
       <div class="row"><button class="secondary" id="unpair">Forget this pairing</button><button class="warn" id="shutdown">Shut down the Nano</button></div>
       <h3 style="margin:10px 0 0; font-size:17px; color:var(--muted); font-weight:600">Start-up, in order</h3>
       <ol class="muted small" style="margin:4px 0 0 18px; padding:0; line-height:1.5">
@@ -521,7 +523,8 @@
       const target = who === "clinician" ? $("said") : $("ptResult");
       target.textContent = "Transcribing…";
       try {
-        const r = await post("/panel/transcribe", { lang: listen, src: to, who, speak: 1, client: 1, raw: 1 }, take.blob);
+        const keep = S.keep ? { keep: 1, speaker: (S.name || "demo").toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 12) || "demo", type: "staff", consent: 1, started: take.startedAt } : {};
+        const r = await post("/panel/transcribe", Object.assign({ lang: listen, src: to, who, speak: 1, client: 1, raw: 1 }, keep), take.blob);
         if (!r.text) { target.textContent = r.say || "(nothing heard)"; return; }
         if (who === "clinician") {
           $("said").textContent = r.text + (r.translated ? "  →  " + r.translated : "");
@@ -647,6 +650,9 @@
     } catch (e) { $("wifiSel").innerHTML = "<option value=''>" + esc(e.message) + "</option>"; }
   }
   $("nanoBtn").onclick = openNano;
+  try { S.keep = sessionStorage.getItem("pk_keep") === "1"; } catch (e) { S.keep = false; }
+  $("keepReplies").checked = !!S.keep;
+  $("keepReplies").onchange = () => { S.keep = $("keepReplies").checked; try { sessionStorage.setItem("pk_keep", S.keep ? "1" : "0"); } catch (e) {} };
   $("testSound").onclick = async () => {
     $("testMsg").textContent = "playing…";
     try { const r = await post("/panel/p011", { lang: S.src || "en", src: S.src || "en", client: 1 }); await playAll(r.audio); $("testMsg").textContent = "If you heard nothing: volume, Silent Mode, then close and reopen the app."; }

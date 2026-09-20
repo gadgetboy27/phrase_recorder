@@ -13,6 +13,7 @@ import hashlib
 import struct
 import json
 import random
+import re
 import string
 import subprocess
 import time
@@ -97,6 +98,38 @@ def file_take(tmp_wav, started_at_ms, lang, speaker, phrase, read_text, translat
     (d / "manifest.json").write_text(json.dumps(m, indent=2, ensure_ascii=False))
     one = dict(m, recordings=[rec])                       # insert just this take (sha256 makes it idempotent)
     sql, _, _ = push.build_insert(one, d.name, None)
+    push.psql(DSN, sql)
+    return d.name, rec
+
+
+def file_reply(tmp_wav, started_at_ms, lang, speaker, text, device=PANEL_DEVICE):
+    """A free-speech reply kept from a DEMO/TRAINING session: filed as an unmatched take (phrase_key null,
+    purpose asr_test, the Whisper transcript as its text) so ingest/push/bench treat it like any other.
+    Never called for real patients — the client's "keep replies" switch is off by default."""
+    d = batch_dir(speaker["id"], lang, device)
+    d.mkdir(parents=True, exist_ok=True)
+    m = _manifest(d, lang, speaker, device)
+    take = 1 + sum(1 for r in m["recordings"] if r.get("unmatched"))
+    slug = re.sub(r"[^a-z0-9]+", "_", (text or "reply").lower()).strip("_")[:40] or "reply"
+    name = f"UNASSIGNED_{slug}_{lang}_patient_replies_asr_test_{speaker['id']}_t{take}_{started_at_ms}.wav"
+    wav = d / name
+    tmp_wav.rename(wav)
+    data = wav.read_bytes()
+    rate, channels, bits, size = wav_format(data)
+    if m["device"].get("sample_rate") is None:
+        m["device"]["sample_rate"] = rate
+    rec = {
+        "file": name, "phrase_key": None, "phrase_version": None,
+        "phrase_text": text or "", "unmatched": True, "category": "patient_replies",
+        "purpose": "asr_test", "take": take, "read_text": None, "translation_source": None,
+        "sample_rate": rate, "duration_ms": int(size / (rate * channels * (bits // 8)) * 1000),
+        "bytes": len(data), "sha256": hashlib.sha256(data).hexdigest(),
+        "recorded_at": time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime(started_at_ms / 1000)) + f".{started_at_ms % 1000:03d}Z",
+    }
+    m["recordings"].append(rec)
+    m["exported_at"] = time.strftime("%Y-%m-%dT%H:%M:%S.000Z", time.gmtime())
+    (d / "manifest.json").write_text(json.dumps(m, indent=2, ensure_ascii=False))
+    sql, _, _ = push.build_insert(dict(m, recordings=[rec]), d.name, None)
     push.psql(DSN, sql)
     return d.name, rec
 

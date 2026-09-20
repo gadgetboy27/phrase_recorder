@@ -135,6 +135,17 @@ API into a sandboxed systemd service, adds the shutdown path unit, and
 installs `phrasekit-internet on|off` — an nftables rule that blocks every
 route off the local network during a consult (`tools/nano.sh internet off`).
 
+## Keeping spoken replies (demo/training only)
+
+Free-speech replies are transient: the WAV is deleted within the hour and only
+the text is in the session log. The iPad's **Nano → Demo / training session**
+switch (off by default, off again when the app closes) files each reply as an
+`UNASSIGNED_…_asr_test` take under the paired iPad's name — the data
+contract's shape for free speech — so `ingest`/`push`/`bench` treat it like
+any other. Whisper does not learn from use; a kept reply is worth something
+only once a speaker corrects its transcript (then `bench.py` scores it and,
+in bulk, it is fine-tuning data). Never switch it on for a real patient.
+
 ## Start-up checklist (demo kit)
 
 People expect instant; the kit needs ~90 s. In order:
