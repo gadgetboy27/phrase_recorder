@@ -104,6 +104,9 @@ udp:
           if (root["nano"].is<const char *>()) {
             std::string u = root["nano"].as<std::string>();
             if (u != id(nano_base)) { ESP_LOGI("beacon", "Nano is at %s", u.c_str()); id(nano_base) = u; id(nano_ok) = false; }
+            id(beacon_at) = millis();
+            JsonObject h = root["health"];
+            if (!h.isNull()) { id(h_speech) = (h["whisper"] | false) && (h["piper"] | false); id(h_translator) = h["translator"].is<const char *>(); id(h_db) = h["db"] | false; }
           }
           return true;
         });
@@ -331,7 +334,10 @@ globals:
   - {id: need_langs,  type: bool, initial_value: 'false'}                   # re-fetch /admin/languages (from the timer)
   - {id: wifi_ssids, type: 'std::vector<std::string>'}                       # Wi-Fi page: the Nano's known networks
   - {id: wifi_target, type: std::string, initial_value: '""'}                # the one just chosen
-  - {id: poll_skip,  type: int, initial_value: '0'}                          # health polls skipped while the Nano is away
+  - {id: beacon_at,  type: uint32_t, initial_value: '0'}                     # millis() of the last beacon from the Nano
+  - {id: h_speech,   type: bool, initial_value: 'false'}                     # health flags carried by the beacon
+  - {id: h_translator, type: bool, initial_value: 'false'}
+  - {id: h_db,       type: bool, initial_value: 'false'}
 
 lvgl:
   displays: [waveshare_display]
@@ -1052,11 +1058,11 @@ interval:
   - interval: 300ms                      # queued reloads run here, from a clean stack
     then:
       - lambda: |-
-          if (id(need_load) && !id(polling)) { id(need_load) = false; ESP_LOGD("diag", "timer → load_phrases (running=%d)", (int) id(load_phrases).is_running()); id(load_phrases).execute(); return; }
-          if (id(need_images) && !id(polling)) { id(need_images) = false; id(fetch_images).execute(); return; }
-          if (id(need_mic) && !id(polling)) { id(need_mic) = false; id(fetch_mic).execute(); return; }
-          if (id(need_heard) && !id(polling)) { id(need_heard) = false; id(fetch_heard).execute(); return; }
-          if (id(need_langs) && !id(polling)) { id(need_langs) = false; id(add_langs).execute(); return; }
+          if (id(need_load) && !id(polling) && id(nano_ok)) { id(need_load) = false; ESP_LOGD("diag", "timer → load_phrases (running=%d)", (int) id(load_phrases).is_running()); id(load_phrases).execute(); return; }
+          if (id(need_images) && !id(polling) && id(nano_ok)) { id(need_images) = false; id(fetch_images).execute(); return; }
+          if (id(need_mic) && !id(polling) && id(nano_ok)) { id(need_mic) = false; id(fetch_mic).execute(); return; }
+          if (id(need_heard) && !id(polling) && id(nano_ok)) { id(need_heard) = false; id(fetch_heard).execute(); return; }
+          if (id(need_langs) && !id(polling) && id(nano_ok)) { id(need_langs) = false; id(add_langs).execute(); return; }
   - interval: 600ms
     then:
       - lambda: |-
@@ -1069,6 +1075,8 @@ script:
   - id: check_nano
     then:
       - lambda: |-
+          // Liveness from the beacon's age — never an HTTP call here: a call to a Nano that is on another
+          // network blocks the loop for the whole timeout (the "freezes on the hotspot").
           static std::string st;
           if (!wifi::global_wifi_component->is_connected()) {
             st = "Wi-Fi: looking for PhraseKit / " + std::string("${wifi_ssid_hint}") + "…";
@@ -1076,40 +1084,23 @@ script:
             id(nano_ok) = false;
             return;
           }
-          if (id(polling)) return;
-          if (!id(nano_ok)) { id(poll_skip)++; if (id(poll_skip) % 3) return; }   // Nano away: every 15 s, not 5 — each miss blocks the loop for the timeout
-          id(polling) = true;
-      - http_request.get:
-          request_headers: {Authorization: "Bearer ${panel_token}"}
-          url: !lambda return id(nano_base) + "/health";
-          capture_response: true
-          max_response_buffer_size: 512
-          on_response:
-            - lambda: |-
-                id(polling) = false;
-                bool whisper = false, piper = false, translator = false, db = false;
-                json::parse_json(body, [&](JsonObject r) -> bool {
-                  whisper = r["whisper"] | false; piper = r["piper"] | false; db = r["db"] | false;
-                  translator = r["translator"].is<const char *>();      // "nllb" or "qwen"; null while neither is up
-                  return true;
-                });
-                static std::string st;
-                std::string host = id(nano_base);                    // "http://172.20.10.12:8765" → "172.20.10.12": where the Nano is, for the iPad
-                if (host.rfind("http://", 0) == 0) host = host.substr(7);
-                if (host.size() > 5 && host.compare(host.size() - 5, 5, ":8765") == 0) host = host.substr(0, host.size() - 5);
-                st = "Wi-Fi: " + std::string([]{ std::array<char, wifi::SSID_BUFFER_SIZE> b; return std::string(wifi::global_wifi_component->wifi_ssid_to(b)); }()) + " ✓  ·  Nano ✓ " + host + "  ·  speech " + (whisper && piper ? "✓" : "✗")
-                   + "  ·  translator " + (translator ? "✓" : "starting…") + "  ·  db " + (db ? "✓" : "✗");
-                lv_label_set_text(id(status_lbl), st.c_str());
-                bool first = !id(nano_ok);
-                id(nano_ok) = true;
-                if (first || id(ph_keys).empty()) id(need_load) = true;
-          on_error:
-            - lambda: |-
-                id(polling) = false;
-                id(nano_ok) = false;
-                static std::string st;
-                st = "Wi-Fi: " + std::string([]{ std::array<char, wifi::SSID_BUFFER_SIZE> b; return std::string(wifi::global_wifi_component->wifi_ssid_to(b)); }()) + " ✓  ·  Nano: not reachable yet…";
-                lv_label_set_text(id(status_lbl), st.c_str());
+          const std::string ssid = []{ std::array<char, wifi::SSID_BUFFER_SIZE> b; return std::string(wifi::global_wifi_component->wifi_ssid_to(b)); }();
+          const bool alive = id(beacon_at) != 0 && (millis() - id(beacon_at)) < 10000;   // beacons come every 3 s
+          if (!alive) {
+            id(nano_ok) = false;
+            st = "Wi-Fi: " + ssid + " ✓  ·  Nano: not on this network (no beacon)";
+            lv_label_set_text(id(status_lbl), st.c_str());
+            return;
+          }
+          std::string host = id(nano_base);                    // "http://172.20.10.12:8765" → "172.20.10.12": where the Nano is, for the iPad
+          if (host.rfind("http://", 0) == 0) host = host.substr(7);
+          if (host.size() > 5 && host.compare(host.size() - 5, 5, ":8765") == 0) host = host.substr(0, host.size() - 5);
+          st = "Wi-Fi: " + ssid + " ✓  ·  Nano ✓ " + host + "  ·  speech " + (id(h_speech) ? "✓" : "✗")
+             + "  ·  translator " + (id(h_translator) ? "✓" : "starting…") + "  ·  db " + (id(h_db) ? "✓" : "✗");
+          lv_label_set_text(id(status_lbl), st.c_str());
+          const bool first = !id(nano_ok);
+          id(nano_ok) = true;
+          if (first || id(ph_keys).empty()) id(need_load) = true;
 
   # Fetch the phrase list for the current language and rebuild the dropdowns + grid.
   - id: load_phrases

@@ -89,7 +89,8 @@ AUDIO_IDS = {}                                            # unguessable id -> Pa
 AUDIO_DEV = "plughw:0,0"                                # the USB PnP sound device: mic + speaker
 WHISPER_MODEL = "ggml-large-v3-turbo-q5_0.bin"
 PORT = 8765
-BEACON_PORT = 18511      # UDP: every 3 s, on every interface, {"nano": "http://<ip>:8765"} so the panel finds us on any Wi-Fi
+BEACON_PORT = 18511      # UDP: every 3 s, on every interface, {"nano": "http://<ip>:8765", "health": {…}} — the panel finds us
+                         # on any Wi-Fi and reads our health from it, so it never has to poll over HTTP (a blocked call froze it)
 # Demo mode: speak an unverified machine translation (NLLB draft) when no approved text exists.
 # The panel still shows it amber as unverified. Set to False for clinical use.
 SPEAK_DRAFTS = True
@@ -394,15 +395,20 @@ def finish_take(take, meta, q, lang, client=False, device=panel_takes.PANEL_DEVI
 def beacon():
     """Broadcast our URL on each interface's subnet so the panel can find the Nano on whatever
     network they both joined (home LAN, a phone hotspot, the PhraseKit hotspot). No fixed IPs."""
+    h, tick = {}, 0
     while True:
         try:
+            if tick % 5 == 0:                                   # health every 15 s: it runs psql and reads the phrase file
+                full = health()
+                h = {"whisper": full["whisper"], "piper": full["piper"], "translator": full["translator"], "db": full["db"]}
+            tick += 1
             out = subprocess.run(["ip", "-4", "-o", "addr"], capture_output=True, text=True).stdout
             for line in out.splitlines():
                 parts = line.split()
                 if "brd" not in parts or parts[1] in ("lo", "docker0"):
                     continue
                 ip, bcast = parts[3].split("/")[0], parts[parts.index("brd") + 1]
-                msg = json.dumps({"nano": f"http://{ip}:{PORT}"}).encode()
+                msg = json.dumps({"nano": f"http://{ip}:{PORT}", "health": h}).encode()
                 s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
                 s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
                 s.sendto(msg, (bcast, BEACON_PORT))
