@@ -300,6 +300,23 @@ def speak_phrase(p, lang, names, client=False):
     return out
 
 
+def speak_reply(p, patient_lang, clinician_lang, names, client=False):
+    """A preset reply the patient tapped: say it in the PATIENT's language first (they hear what they chose),
+    then in the clinician's. The patient half is skipped when that language has no real voice or
+    recording — no "Sorry, I can't say that…" in the patient's ear. Returns the clinician-side reply dict
+    with "audio" (client) or plays both halves in order on the Nano."""
+    pt = _speak_phrase(p, patient_lang, names, client=True)         # synthesise only; play below, in order
+    cl = _speak_phrase(p, clinician_lang, names, client=True)
+    wavs_pt = pt.pop("_wavs", None) or [] if pt.get("lang") == patient_lang and patient_lang != clinician_lang else []
+    wavs_cl = cl.pop("_wavs", None) or []
+    if client:
+        cl["audio"] = [serve_audio(w) for w in wavs_pt + wavs_cl]
+    elif wavs_pt or wavs_cl:
+        audio.play(*(wavs_pt + wavs_cl))
+    cl["patient_spoken"] = bool(wavs_pt)
+    return cl
+
+
 def _speak_phrase(p, lang, names, client):
     tr = p["text"] if lang == "en" else p["translations"].get(lang)
     recs = recording_index().get((p["key"], lang), []) if lang != "en" else []
@@ -408,7 +425,7 @@ def beacon():
                 if "brd" not in parts or parts[1] in ("lo", "docker0"):
                     continue
                 ip, bcast = parts[3].split("/")[0], parts[parts.index("brd") + 1]
-                msg = json.dumps({"nano": f"http://{ip}:{PORT}", "health": h}).encode()
+                msg = json.dumps({"nano": f"http://{ip}:{PORT}", "health": h, "moving_to": panel_admin.moving_to()}).encode()
                 s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
                 s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
                 s.sendto(msg, (bcast, BEACON_PORT))
@@ -583,7 +600,7 @@ class Handler(BaseHTTPRequestHandler):
                 if not p:
                     return self.reply(404, {"say": "unknown reply"})
                 src = q.get("src", "en")
-                out = speak_phrase(p, src, names, client)
+                out = speak_reply(p, lang, src, names, client)        # patient's language first, then the clinician's
                 out["key"] = p["key"]
                 out["patient_text"] = for_panel(p["translations"].get(lang), lang) or p["text"]
                 panel_drafts.log_turn("patient", kind="preset", key=p["key"], sourceText=out["patient_text"],
