@@ -105,6 +105,14 @@ udp:
             std::string u = root["nano"].as<std::string>();
             if (u != id(nano_base)) { ESP_LOGI("beacon", "Nano is at %s", u.c_str()); id(nano_base) = u; id(nano_ok) = false; }
             id(beacon_at) = millis();
+            // the Nano was told (by an iPad) to move: follow it, exactly as if this panel had asked
+            if (root["moving_to"].is<const char *>()) {
+              std::string to = root["moving_to"].as<std::string>();
+              if (!to.empty() && to != id(wifi_follow) && (to == "${w_ssid1}" || to == "${w_ssid2}" || to == "${w_ssid3}")) {
+                id(wifi_follow) = to; id(wifi_target) = to; id(need_follow) = true;
+                ESP_LOGI("beacon", "Nano is moving to %s — following", to.c_str());
+              }
+            }
             JsonObject h = root["health"];
             if (!h.isNull()) { id(h_speech) = (h["whisper"] | false) && (h["piper"] | false); id(h_translator) = h["translator"].is<const char *>(); id(h_db) = h["db"] | false; }
           }
@@ -335,6 +343,8 @@ globals:
   - {id: wifi_ssids, type: 'std::vector<std::string>'}                       # Wi-Fi page: the Nano's known networks
   - {id: wifi_target, type: std::string, initial_value: '""'}                # the one just chosen
   - {id: beacon_at,  type: uint32_t, initial_value: '0'}                     # millis() of the last beacon from the Nano
+  - {id: wifi_follow, type: std::string, initial_value: '""'}                # last "moving_to" acted on (once per move)
+  - {id: need_follow, type: bool, initial_value: 'false'}                    # follow the Nano (from the timer, not the UDP callback)
   - {id: h_speech,   type: bool, initial_value: 'false'}                     # health flags carried by the beacon
   - {id: h_translator, type: bool, initial_value: 'false'}
   - {id: h_db,       type: bool, initial_value: 'false'}
@@ -1063,6 +1073,7 @@ interval:
           if (id(need_mic) && !id(polling) && id(nano_ok)) { id(need_mic) = false; id(fetch_mic).execute(); return; }
           if (id(need_heard) && !id(polling) && id(nano_ok)) { id(need_heard) = false; id(fetch_heard).execute(); return; }
           if (id(need_langs) && !id(polling) && id(nano_ok)) { id(need_langs) = false; id(add_langs).execute(); return; }
+          if (id(need_follow)) { id(need_follow) = false; id(wifi_follow_go).execute(); return; }
   - interval: 600ms
     then:
       - lambda: |-
@@ -1625,6 +1636,25 @@ script:
                   - lambda: 'lv_label_set_text(id(wifi_msg), "Joined — waiting for the Nano beacon…"); lv_scr_load(id(page_start)->obj);'
                 on_error:
                   - lambda: 'lv_label_set_text(id(wifi_msg), "Could not join that network — the panel reconnects to what it can find.");'
+
+  # The Nano announced a move (an iPad asked): wait for it to go, then join the same network.
+  - id: wifi_follow_go
+    then:
+      - lambda: |-
+          static std::string m; m = "Nano is moving to " + id(wifi_target) + " — following in 12 s";
+          lv_label_set_text(id(status_lbl), m.c_str());
+      - delay: 12s
+      - lambda: 'id(nano_ok) = false; lv_label_set_text(id(status_lbl), "Wi-Fi: joining the Nano network…");'
+      - wifi.configure:
+          ssid: !lambda return id(wifi_target);
+          password: !lambda |-
+            if (id(wifi_target) == "${w_ssid1}") return std::string("${w_pw1}");
+            if (id(wifi_target) == "${w_ssid2}") return std::string("${w_pw2}");
+            return std::string("${w_pw3}");
+          save: false
+          timeout: 45s
+          on_error:
+            - lambda: 'lv_label_set_text(id(status_lbl), "Could not join that network — reconnecting to what I can find.");'
 
   # Pull the Nano-rendered images for the patient page (only for scripts the panel can't draw).
   - id: fetch_images

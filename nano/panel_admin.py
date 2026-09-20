@@ -313,8 +313,17 @@ def wifi_request(ssid):
         return 400, {"say": f"{ssid!r} is not a network the Nano knows"}
     if not runtime.is_dir():
         return 503, {"say": "Wi-Fi switching needs tools/nano.sh install (root helper missing)"}
+    MOVING.update(ssid=ssid, until=time.time() + 20)          # the beacon says so for 20 s: the panel follows
     (runtime / "wifi").write_text(ssid)
     return 200, {"say": f"Switching the Nano to {ssid} — join it on this device, then open the app again", "ssid": ssid}
+
+
+MOVING = {"ssid": None, "until": 0}
+
+
+def moving_to():
+    """The network the Nano is about to switch to, while the announcement is fresh, else None."""
+    return MOVING["ssid"] if time.time() < MOVING["until"] else None
 
 
 def wifi():
