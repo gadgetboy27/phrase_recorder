@@ -369,7 +369,7 @@ if __name__ == "__main__":
     if sys.argv[1:2] == ["pair"]:
         names, ips = _addresses()
         print(f"pairing code {new_pair_code()} (valid {PAIR_TTL // 60} min)")
-        print("on the iPad open  https://" + (ips[-1] if ips else "10.42.0.1") + ":8766/setup")
+        print(f"on the iPad open  https://{socket.gethostname().lower()}.local:8766/setup   (one address on every network — pair this one)")
     elif sys.argv[1:2] == ["devices"]:
         for t, v in devices().items():
             print(f"{t[:8]}…  {v['kind']:5s} {v['name']:20s} added {v['added']}")

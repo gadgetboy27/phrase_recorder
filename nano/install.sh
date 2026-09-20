@@ -10,6 +10,7 @@
 #                               this root unit powers the Nano off.
 #   phrase-panel-wifi.path      the API writes an SSID to /run/phrase-panel/wifi; root switches networks
 #                               (falls back to the previous one if the new one fails).
+#   90-phrasekit-internet       NM dispatcher: internet off automatically on any Wi-Fi that is not home
 #   phrasekit-internet          on|off|status — nftables rule that blocks every route to the internet
 #                               (from the Nano and from anything on its hotspot) while a consult runs.
 #                               `off` at a demo, `on` at home for fonts/Google-voice caching. Passwordless
@@ -128,6 +129,19 @@ Description=Wi-Fi switch requested by the panel
 Type=oneshot
 ExecStart=/usr/local/sbin/phrasekit-wifi
 EOF
+
+# NetworkManager dispatcher: whenever Wi-Fi comes up, block the internet unless it is the home network —
+# a phone hotspot is for the panel and iPads, not for apt/snap (the Nano pulled 2.66 GB through one).
+cat > /etc/NetworkManager/dispatcher.d/90-phrasekit-internet <<'EOF'
+#!/bin/sh
+[ "$2" = "up" ] || exit 0
+ssid=$(nmcli -t -f ACTIVE,SSID dev wifi list --rescan no 2>/dev/null | awk -F: '$1=="yes"{print $2; exit}')
+case "$ssid" in
+  gadgetboy2|"") /usr/local/sbin/phrasekit-internet on ;;
+  *)             /usr/local/sbin/phrasekit-internet off ;;
+esac
+EOF
+chmod 755 /etc/NetworkManager/dispatcher.d/90-phrasekit-internet
 
 cat > /usr/local/sbin/phrasekit-internet <<'EOF'
 #!/bin/sh

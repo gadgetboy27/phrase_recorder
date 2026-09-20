@@ -121,7 +121,9 @@ translation; the recording is kept and the text can be added later.
 The Nano serves the same six screens as a web app at `http://<nano>:8765/` and
 `https://<nano>:8766/` (the Waveshare and the iPad share one API). The iPad's
 own mic and speaker are used, so the Nano can sit in a bag on its hotspot.
-One-time per iPad: open `/setup` — install the Nano's CA (`/ca.crt`, then
+One-time per iPad: open `https://gadgetboy-nano.local:8766/setup` (that name
+resolves on every network the Nano joins; Safari keeps the pairing per
+address, so always use it) — install the Nano's CA (`/ca.crt`, then
 Certificate Trust Settings), pair with a code from `tools/nano.sh pair`, add
 to the Home Screen. Every API call carries a device token (`devices.json` on
 the Nano; `tools/nano.sh devices|revoke`); the Waveshare's is `panel_token`
