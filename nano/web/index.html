@@ -111,6 +111,7 @@
   <button class="secondary small" id="change">change</button>
   <span class="spacer"></span>
   <button id="mode">+ Add phrase</button>
+  <button id="nanoBtn" class="secondary">Nano</button>
   <select id="cat"><option value="">All categories</option></select>
 </header>
 
@@ -185,11 +186,24 @@
       <h3>Translations</h3>
       <div class="muted small">Record mode: tap a phrase on the main screen, read it aloud in the patient's language, tap it again to save. Each take is filed as a batch with a Whisper draft.</div>
       <button class="primary" style="background:var(--amber)" id="addRec">Record translations →</button>
-      <h3>Session</h3>
       <div class="muted small" id="whoami"></div>
-      <h3>Wi-Fi — move the Nano to another network it knows</h3>
+    </div>
+  </div>
+</section>
+
+<!-- 7. the Nano: where it is, move it, shut it down -->
+<section class="screen hidden" id="nano">
+  <div class="row"><div class="title grow">Nano</div><button class="secondary" id="nanoBack">Back</button></div>
+  <div class="cols" style="display:flex; gap:16px; flex:1; min-height:0">
+    <div class="col" style="flex:1; display:flex; flex-direction:column; gap:10px; overflow:auto">
+      <h3 style="margin:6px 0 0; font-size:17px; color:var(--muted); font-weight:600">Wi-Fi — move the Nano to another network it knows</h3>
       <div class="row"><select id="wifiSel" class="grow"><option>loading…</option></select><button class="primary" style="background:var(--steel)" id="wifiBtn">Move</button></div>
-      <div class="muted small">After it moves, join the same Wi-Fi on this iPad and reopen the app — <code>https://gadgetboy-nano.local:8766/</code> works on every network.</div>
+      <div class="muted small">Away from home the Nano joins the hotspot by itself; this is for when both networks are in range. After it moves, put this iPad on the same Wi-Fi and reopen the app — <code>https://gadgetboy-nano.local:8766/</code> works everywhere.</div>
+      <div class="muted small" id="nanoInfo"></div>
+    </div>
+    <div class="col" style="flex:1; display:flex; flex-direction:column; gap:10px; overflow:auto">
+      <h3 style="margin:6px 0 0; font-size:17px; color:var(--muted); font-weight:600">This iPad</h3>
+      <div class="muted small" id="pairInfo"></div>
       <div class="row"><button class="secondary" id="unpair">Forget this pairing</button><button class="warn" id="shutdown">Shut down the Nano</button></div>
       <div class="muted small">Setup for another iPad: <code id="setupUrl"></code></div>
     </div>
@@ -562,13 +576,8 @@
     c.value = "intake";
     $("addText").value = ""; $("addStatus").textContent = ""; S.addFile = ""; $("addMic").textContent = "●  Say it";
     $("addRec").textContent = "Record translations in " + langName(S.dst) + " →";
-    $("whoami").textContent = "This iPad is paired as “" + S.name + "”. Clinician " + langName(S.src) + " → patient " + langName(S.dst) + ".";
-    $("setupUrl").textContent = location.origin + "/setup";
+    $("whoami").textContent = "Recording as “" + S.spk.id + "” (" + S.spk.type + "). Clinician " + langName(S.src) + " → patient " + langName(S.dst) + ".";
     show("add");
-    try {
-      const w = await api("/admin/wifi"); const ws = $("wifiSel"); ws.innerHTML = "";
-      for (const n of w.networks) { const o = document.createElement("option"); o.value = n.ssid; o.textContent = n.ssid + (n.active ? "  ● Nano is here" : n.signal != null ? "  · in sight " + n.signal + "%" : "  · not in sight"); if (n.active) o.selected = true; ws.appendChild(o); }
-    } catch (e) { $("wifiSel").innerHTML = "<option value=''>" + esc(e.message) + "</option>"; }
     try {
       const r = await api("/admin/languages"); const s = $("addLang"); s.innerHTML = "";
       for (const l of r.languages) { const o = document.createElement("option"); o.value = l.code; o.textContent = l.label + (l.font ? "" : " (font will download)"); s.appendChild(o); }
@@ -576,6 +585,21 @@
     } catch (e) { $("addLang").innerHTML = "<option value=''>" + esc(e.message) + "</option>"; }
   }
   $("addBack").onclick = async () => { if (S.rec) await stopRec(); show("main"); };
+
+  // ---- Nano screen ----
+  async function openNano() {
+    $("pairInfo").textContent = "Paired as “" + S.name + "”" + (S.src && S.dst ? " · clinician " + langName(S.src) + " → patient " + langName(S.dst) : "") + ".";
+    $("setupUrl").textContent = "https://" + location.host + "/setup";
+    $("wifiSel").innerHTML = "<option>loading…</option>"; $("nanoInfo").textContent = "";
+    show("nano");
+    try {
+      const w = await api("/admin/wifi"); const ws = $("wifiSel"); ws.innerHTML = "";
+      for (const n of w.networks) { const o = document.createElement("option"); o.value = n.ssid; o.textContent = n.ssid + (n.active ? "  ● Nano is here" : n.signal != null ? "  · in sight " + n.signal + "%" : "  · not in sight"); if (n.active) o.selected = true; ws.appendChild(o); }
+      $("nanoInfo").textContent = "The Nano is on " + (w.current.ssid || "wired") + (w.current.ip ? " at " + w.current.ip : "") + ".";
+    } catch (e) { $("wifiSel").innerHTML = "<option value=''>" + esc(e.message) + "</option>"; }
+  }
+  $("nanoBtn").onclick = openNano;
+  $("nanoBack").onclick = () => show("main");
   $("addMic").onclick = async () => {
     if (S.rec) {
       const take = await stopRec(); $("addMic").textContent = "●  Say it"; $("addStatus").textContent = "Transcribing…";
