@@ -274,6 +274,18 @@ def _addresses():
         pass
     ips = {i for i in ips if not i.startswith("172.17.")}        # docker bridge is not an address of ours
     ips |= {f"172.20.10.{n}" for n in range(2, 15)}                # every address an iPhone hotspot can hand us
+    # Remember every address we have ever had: the certificate is re-issued whenever this set grows, and
+    # it must never LOSE the home address just because it was re-issued while on a hotspot (2026-09-20).
+    seen = TLS / "addresses.txt"
+    try:
+        ips |= set(seen.read_text().split())
+    except OSError:
+        pass
+    try:
+        TLS.mkdir(parents=True, exist_ok=True)
+        seen.write_text("\n".join(sorted(ips)) + "\n")
+    except OSError:
+        pass
     return sorted(names), sorted(ips)
 
 
