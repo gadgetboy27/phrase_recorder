@@ -135,6 +135,21 @@ API into a sandboxed systemd service, adds the shutdown path unit, and
 installs `phrasekit-internet on|off` — an nftables rule that blocks every
 route off the local network during a consult (`tools/nano.sh internet off`).
 
+## Start-up checklist (demo kit)
+
+People expect instant; the kit needs ~90 s. In order:
+
+1. Away from home: phone hotspot on **first**, and keep the Personal Hotspot
+   screen open until everything has joined.
+2. Power the Nano. Wait for the iPad's status line (or the panel's) to go
+   green — the beacon is what says "ready". Nothing works before that.
+3. iPad on the same Wi-Fi as the Nano; open PhraseKit. A red status line
+   means the two are on different networks.
+4. **Nano → Test sound** once. Nothing heard: volume, Silent Mode, then close
+   and reopen the app (iOS drops the audio session after sleep).
+5. Choose the languages and start. After the iPad has slept, reopen the app
+   before the next patient.
+
 ## Deploy
 
 Cloudflare Pages project `phrase-recorder`, connected to this repo. Push to
