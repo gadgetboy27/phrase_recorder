@@ -151,7 +151,7 @@
   <div id="ptSrc"></div>
   <div id="replies"></div>
   <div class="bottom">
-    <div class="result"><div class="who muted small">Reply, for the clinician</div><div id="ptResult">—</div></div>
+    <div class="result"><div class="who muted small" id="ptResultWho">Reply, for the clinician</div><div id="ptResult">—</div></div>
     <button class="mic" id="ptMic">● Tap to reply</button>
     <button class="back" id="ptBack">Back to clinician</button>
   </div>
@@ -165,7 +165,7 @@
   </div>
   <div class="bottom">
     <div class="muted small grow" id="rpTime" style="align-self:center"></div>
-    <button class="mic" id="rpAgain">Reply again</button>
+    <button class="mic" id="rpAgain">↻ Say it again</button>
     <button class="back" id="rpBack">Back to clinician</button>
   </div>
 </section>
@@ -314,10 +314,30 @@
     const src = ctx.createMediaStreamSource(stream);
     const proc = ctx.createScriptProcessor(4096, 1, 1);          // the one path that works on every iPad
     const chunks = [];
-    proc.onaudioprocess = (e) => chunks.push(new Float32Array(e.inputBuffer.getChannelData(0)));
+    const rec = { ctx, proc, src, stream, chunks, startedAt: Date.now(), timer: null,
+                  noise: 1, lastVoice: 0, voiceMs: 0, pending: false, partialAt: 0 };
+    proc.onaudioprocess = (e) => {
+      const d = e.inputBuffer.getChannelData(0);
+      chunks.push(new Float32Array(d));
+      let sum = 0; for (let i = 0; i < d.length; i++) sum += d[i] * d[i];
+      const rms = Math.sqrt(sum / d.length);
+      rec.noise = Math.min(rec.noise * 1.002, Math.max(rms, 0.0015));       // slow-tracking noise floor
+      if (rms > Math.max(0.012, rec.noise * 3.5)) { rec.lastVoice = Date.now(); rec.voiceMs += d.length / ctx.sampleRate * 1000; }
+    };
     src.connect(proc); proc.connect(ctx.destination);
-    S.rec = { ctx, proc, src, stream, chunks, startedAt: Date.now(), timer: null };
-    return S.rec;
+    S.rec = rec;
+    return rec;
+  }
+  function encodeWav(chunks, rate) {                                  // 16-bit PCM mono, as public/index.html writes it
+    let n = 0; for (const c of chunks) n += c.length;
+    const buf = new ArrayBuffer(44 + n * 2), v = new DataView(buf);
+    const str = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+    str(0, "RIFF"); v.setUint32(4, 36 + n * 2, true); str(8, "WAVE"); str(12, "fmt "); v.setUint32(16, 16, true);
+    v.setUint16(20, 1, true); v.setUint16(22, 1, true); v.setUint32(24, rate, true); v.setUint32(28, rate * 2, true);
+    v.setUint16(32, 2, true); v.setUint16(34, 16, true); str(36, "data"); v.setUint32(40, n * 2, true);
+    let o = 44;
+    for (const c of chunks) for (let i = 0; i < c.length; i++, o += 2) { const x = Math.max(-1, Math.min(1, c[i])); v.setInt16(o, x < 0 ? x * 0x8000 : x * 0x7FFF, true); }
+    return new Blob([buf], { type: "audio/wav" });
   }
   async function stopRec() {
     const r = S.rec; if (!r) return null;
@@ -328,19 +348,33 @@
     const rate = r.ctx.sampleRate;
     try { await r.ctx.close(); } catch (e) {}
     let n = 0; for (const c of r.chunks) n += c.length;
-    const buf = new ArrayBuffer(44 + n * 2), v = new DataView(buf);
-    const str = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
-    str(0, "RIFF"); v.setUint32(4, 36 + n * 2, true); str(8, "WAVE"); str(12, "fmt "); v.setUint32(16, 16, true);
-    v.setUint16(20, 1, true); v.setUint16(22, 1, true); v.setUint32(24, rate, true); v.setUint32(28, rate * 2, true);
-    v.setUint16(32, 2, true); v.setUint16(34, 16, true); str(36, "data"); v.setUint32(40, n * 2, true);
-    let o = 44;
-    for (const c of r.chunks) for (let i = 0; i < c.length; i++, o += 2) { const s = Math.max(-1, Math.min(1, c[i])); v.setInt16(o, s < 0 ? s * 0x8000 : s * 0x7FFF, true); }
-    return { blob: new Blob([buf], { type: "audio/wav" }), startedAt: r.startedAt, seconds: n / rate };
+    return { blob: encodeWav(r.chunks, rate), startedAt: r.startedAt, seconds: n / rate };
   }
-  function timerOn(el, prefix) {
+  // The live loop while recording: the button shows the time, then a countdown once the speaker has
+  // stopped (auto-stop after 2 s of silence, never before 1.5 s of speech); every ~3 s the audio so far
+  // goes to the Nano for a partial transcript in the speaker's language, shown in `box`.
+  const SILENCE_MS = 2000, MIN_VOICE_MS = 1500, PARTIAL_EVERY = 3000;
+  function timerOn(el, prefix, opts) {
     const r = S.rec; if (!r) return;
-    const tick = () => { el.innerHTML = prefix + "<br><span class='small'>" + Math.round((Date.now() - r.startedAt) / 1000) + " s</span>"; };
-    tick(); r.timer = setInterval(tick, 500);
+    opts = opts || {};
+    const tick = async () => {
+      if (S.rec !== r) return;
+      const now = Date.now(), secs = Math.round((now - r.startedAt) / 1000);
+      const quiet = r.lastVoice ? now - r.lastVoice : 0;
+      let line = secs + " s";
+      if (r.voiceMs >= MIN_VOICE_MS && quiet >= 800) line = "· " + Math.max(1, Math.ceil((SILENCE_MS - quiet) / 1000)) + "…";
+      el.innerHTML = prefix + "<br><span class='small'>" + line + "</span>";
+      if (r.voiceMs >= MIN_VOICE_MS && quiet >= SILENCE_MS && opts.onSilence) { opts.onSilence(); return; }
+      if (opts.lang && opts.box && !r.pending && now - r.partialAt >= PARTIAL_EVERY && r.voiceMs > 400) {
+        r.pending = true; r.partialAt = now;
+        try {
+          const j = await post("/panel/partial", { lang: opts.lang, raw: 1 }, encodeWav(r.chunks, r.ctx.sampleRate));
+          if (S.rec === r && j.text) opts.box.textContent = j.text;
+        } catch (e) { /* the final pass will say what went wrong */ }
+        r.pending = false;
+      }
+    };
+    tick(); r.timer = setInterval(tick, 250);
   }
 
   // ================= languages =================
@@ -453,7 +487,7 @@
       b.onclick = () => replyTap(q);
       rp.appendChild(b);
     }
-    $("ptResult").textContent = "—";
+    $("ptResult").textContent = "—"; $("ptResultWho").textContent = "Reply, for the clinician";
     micLabel();
     show("patient");
   }
@@ -493,11 +527,12 @@
           $("said").textContent = r.text + (r.translated ? "  →  " + r.translated : "");
           if (r.translated) showFree(r.text, r.translated);
         } else {
+          $("ptResultWho").textContent = "Reply, for the clinician";
           $("ptResult").textContent = r.say; $("heard").textContent = r.translated || r.text;
           $("rpHeard").textContent = r.text; $("rpHeard").classList.toggle("rtl", isRtl(S.dst));
           $("rpTrans").textContent = r.translated || "(no translation — is the translator running?)";
           $("rpTime").textContent = "Reply took " + Math.round((Date.now() - take.startedAt) / 1000) + " s";
-          $("rpAgain").textContent = uiText("p022", "Reply again"); $("rpAgain").style.background = colour(S.dst);
+          $("rpAgain").textContent = "↻ " + uiText("p022", "Reply again"); $("rpAgain").style.background = colour(S.dst);
           show("reply");
         }
         playAll(r.audio);
@@ -507,8 +542,10 @@
     stopPlaying();
     try { await startRec(); } catch (e) { alertStatus("Microphone not available: " + e.message + " — is this page open over https and trusted?"); return; }
     btn.classList.add("live");
-    if (who === "clinician") { $("said").textContent = "Listening…"; timerOn($("mic"), "■ Stop"); }
-    else { $("ptResult").textContent = "Listening…"; micLabel(); timerOn($("ptMic"), "■ " + esc(uiText("p021", "Stop"))); }
+    const listen = who === "clinician" ? S.src : S.dst;
+    const onSilence = () => { if (S.rec) freeSpeech(btn, who); };
+    if (who === "clinician") { $("said").textContent = "Listening…"; timerOn($("mic"), "■ Stop", { lang: listen, box: $("said"), onSilence }); }
+    else { $("ptResult").textContent = "Listening…"; $("ptResultWho").textContent = langName(S.dst); micLabel(); timerOn($("ptMic"), "■ " + esc(uiText("p021", "Stop")), { lang: listen, box: $("ptResult"), onSilence }); }
   }
   function showFree(heard, translated) {          // the clinician said something free-form: show it to the patient
     S.cur = null;
@@ -524,7 +561,7 @@
   }
   $("mic").onclick = () => { if (S.mode === "record") { if (S.rec && S.last != null) recordTake(S.last); return; } setTurn(S.turn); freeSpeech($("mic"), S.turn === 0 ? "clinician" : "patient"); };
   $("ptMic").onclick = () => { setTurn(1); freeSpeech($("ptMic"), "patient"); };
-  $("rpAgain").onclick = () => { if (S.cur != null) showPatient(S.cur); else show("patient"); };
+  $("rpAgain").onclick = () => { if (S.cur != null) showPatient(S.cur); else show("patient"); setTurn(1); freeSpeech($("ptMic"), "patient"); };
   $("rpBack").onclick = () => { setTurn(0); show("main"); };
   $("srcChip").onclick = () => setTurn(0); $("dstChip").onclick = () => setTurn(1);
   $("change").onclick = () => { renderLangs($("srcLangs"), "src"); show("start"); };
@@ -549,7 +586,7 @@
     const read = S.dst === "en" ? p.text : p.translation;
     $("said").textContent = read ? "Read aloud:\n" + read : "No " + langName(S.dst) + " text yet — say it in your own words:\n" + p.text;
     try { await startRec(); } catch (e) { alertStatus("Microphone not available: " + e.message); recPhrase = null; return; }
-    $("mic").classList.add("live"); timerOn($("mic"), "■ Stop");
+    $("mic").classList.add("live"); timerOn($("mic"), "■ Stop", { onSilence: () => { if (S.rec && recPhrase === i) recordTake(i); } });
   }
   function setMode(on) {
     S.mode = on ? "record" : "speak";

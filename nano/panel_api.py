@@ -86,6 +86,7 @@ PUBLIC_GET = {"/", "/index.html", "/app.js", "/app.css", "/setup", "/setup.html"
               "/icon.svg", "/icon-192.png", "/icon-512.png", "/ca.crt", "/health", "/render", "/render/replies"}
 PUBLIC_POST = {"/pair"}
 AUDIO_IDS = {}                                            # unguessable id -> Path, for GET /audio/<id>
+WHISPER_LOCK = threading.Lock()                           # one whisper-cli at a time: partials and finals share the GPU
 AUDIO_DEV = "plughw:0,0"                                # the USB PnP sound device: mic + speaker
 WHISPER_MODEL = "ggml-large-v3-turbo-q5_0.bin"
 PORT = 8765
@@ -383,7 +384,8 @@ def finish_take(take, meta, q, lang, client=False, device=panel_takes.PANEL_DEVI
                                               meta["phrase"], meta["read_text"], meta["translation_source"], device)
         wav = panel_takes.RECORDINGS / batch_id / rec["file"]
         wl = asr_worker.WHISPER_LANG.get(lang, lang)
-        text = asr_worker.transcribe(WHISPER_MODEL, wl, [wav])[str(wav)]
+        with WHISPER_LOCK:
+            text = asr_worker.transcribe(WHISPER_MODEL, wl, [wav])[str(wav)]
         panel_takes.draft_transcript(batch_id, rec, lang, meta["phrase"], text, WHISPER_MODEL)
         say = f"Take {rec['take']} saved ({rec['duration_ms'] / 1000:.1f} s)"
         if text and lang != "en":
@@ -391,7 +393,8 @@ def finish_take(take, meta, q, lang, client=False, device=panel_takes.PANEL_DEVI
         log(f"take filed: {batch_id}/{rec['file']}")
         return 200, {"say": say, "text": text, "file": rec["file"], "batch": batch_id, "take": rec["take"]}
     wl = asr_worker.WHISPER_LANG.get(lang, lang)
-    text = asr_worker.transcribe(WHISPER_MODEL, wl, [take])[str(take)]
+    with WHISPER_LOCK:
+        text = asr_worker.transcribe(WHISPER_MODEL, wl, [take])[str(take)]
     out = {"say": shape(text, lang) or "(nothing heard)", "text": text, "file": take.name}
     src = q.get("src", "en")
     if text and lang != src and (llama_up() or panel_drafts.nllb_available()):
@@ -646,6 +649,20 @@ class Handler(BaseHTTPRequestHandler):
                 if not take:
                     return self.reply(409, {"say": "Not recording"})
                 return self.reply(*finish_take(take, meta, q, lang, client))
+            if action == "partial":                                   # live text while the client is still recording
+                if len(body) < 1000 or body[:4] != b"RIFF":
+                    return self.reply(400, {"say": "Send a WAV file as the request body"})
+                if lang in asr_worker.WHISPER_UNSUPPORTED:
+                    return self.reply(200, {"text": None})
+                WORK.mkdir(parents=True, exist_ok=True)
+                tmp = WORK / f"partial_{threading.get_ident()}.wav"
+                tmp.write_bytes(body)
+                try:
+                    with WHISPER_LOCK:
+                        text = asr_worker.transcribe(WHISPER_MODEL, asr_worker.WHISPER_LANG.get(lang, lang), [tmp])[str(tmp)]
+                finally:
+                    tmp.unlink(missing_ok=True)
+                return self.reply(200, {"text": text})
             if action == "transcribe":                                # a WAV recorded by the client (iPad mic)
                 if len(body) < 1000 or body[:4] != b"RIFF" or body[8:12] != b"WAVE":
                     return self.reply(400, {"say": "Send a WAV file as the request body"})
