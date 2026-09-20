@@ -1203,9 +1203,9 @@ script:
               id(shown).push_back(i);
               std::string t = id(ph_src)[i].empty() ? id(ph_texts)[i] : id(ph_src)[i];
               if (t.size() > 64) t = t.substr(0, 63) + "…";
-              if (id(ph_rec)[i]) t += "  ●";                 // a native recording exists in this language
+              // a human recording exists in this language: say so in the small key label, not as a blob in the text
               lv_label_set_text(lbls[n], t.c_str());
-              lv_label_set_text(keys[n], id(ph_keys)[i].c_str());
+              { static std::string k[6]; k[n] = id(ph_keys)[i] + (id(ph_rec)[i] ? "  · recorded" : ""); lv_label_set_text(keys[n], k[n].c_str()); }
               const bool used = (i == id(last_used));
               lv_obj_set_style_bg_color(btns[n], lv_color_hex(used ? lang_colour(id(lang_code)) : ${c_panel}), LV_PART_MAIN);
               lv_obj_set_style_border_color(btns[n], lv_color_hex(used ? lang_colour(id(lang_code)) : ${c_sage}), LV_PART_MAIN);
