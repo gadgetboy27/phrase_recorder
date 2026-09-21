@@ -37,6 +37,7 @@ VAD_MODEL = WHISPER / "models" / "ggml-silero-v6.2.0.bin"
 # ~1 s a call instead of ~2.5 s, because whisper-cli reloaded 1.6 GB of weights every time it ran.
 WHISPER_URL = "http://127.0.0.1:8178"
 SERVER_MODEL = "ggml-large-v3-turbo-q5_0.bin"     # what the unit loads; a bench of another model goes through whisper-cli
+USE_SERVER = True                                  # speedbench.py flips this to time the cli path on purpose
 LLAMA_URL = "http://127.0.0.1:8080/v1/chat/completions"
 # Whisper's language ids don't line up with ours everywhere: Dari is decoded as
 # Farsi; Tongan and Samoan aren't in Whisper at all (no drafts, no scores —
@@ -118,7 +119,7 @@ def transcribe(model, language, wavs):
     is honoured by the cli path; the server only ever serves SERVER_MODEL."""
     if not wavs:
         return {}
-    if model == SERVER_MODEL and server_up():
+    if USE_SERVER and model == SERVER_MODEL and server_up():
         try:
             return {str(w): _server_transcribe(language, w) for w in wavs}
         except Exception as e:                     # server died / rejected the file: the cli still works

@@ -2,7 +2,7 @@
 # Day-to-day menu for the Nano, from the Mac.
 #
 #   tools/nano.sh            # interactive menu
-#   tools/nano.sh status     # or any item by name: status start panel install pair devices revoke internet hotspot fonts test
+#   tools/nano.sh status     # or any item by name: status start panel install pair devices revoke internet hotspot fonts test speed
 #                            #                       ingest push bench translations backup reboot shutdown
 #
 # Sets the env the other tools need (NANO_SSH, NANO_DEST, PG_DSN, libpq on PATH)
@@ -111,6 +111,15 @@ hotspot() {
   esac
 }
 
+# Stage-by-stage speed check ON the Nano over localhost (no Wi-Fi, no panel): whisper-cli vs whisper-server,
+# NLLB beam 4 vs 2, piper, HTTP connection cost. Runs the repo's current nano/*.py from a scratch folder —
+# the deployed service is untouched — so it works before `install`/`panel`. nano/speedbench.py explains.
+speed() {
+  need_up || return
+  ssh "$NANO_SSH" 'mkdir -p ~/panel_speed'
+  scp -q nano/speedbench.py nano/asr_worker.py nano/panel_drafts.py tools/push.py "$NANO_SSH:panel_speed/"
+  ssh "$NANO_SSH" 'cd ~/panel_speed && python3 speedbench.py'
+}
 # One-time root setup on the Nano: sandboxed systemd services, shutdown path unit, internet on/off rule.
 # Asks for your password on the Nano (nano/install.sh explains each piece).
 install()      { need_up && scp -q nano/install.sh "$NANO_SSH:panel/install.sh" && ssh -t "$NANO_SSH" 'sudo bash ~/panel/install.sh'; }
@@ -148,6 +157,7 @@ menu() {
   2) start         start llama-server (Qwen) if it isn't running
   p) panel         deploy/restart the touch-panel API (nano/panel_api.py)
   t) test          regression tests: panel fonts vs texts, Nano API per language, panel liveness
+  s) speed         stage-by-stage timings on the Nano itself (old path vs new), nothing deployed
   h) hotspot       on|off|status — the Nano's PhraseKit Wi-Fi hotspot for demos
   f) fonts         fetch every Noto font "Add a language" could need (needs internet, once)
   i) install       one-time root setup on the Nano: sandboxed services, shutdown unit, internet switch
@@ -164,7 +174,7 @@ menu() {
 EOF
     read -r -p "> " c
     case "$c" in
-      1|status) status ;; 2|start) start ;; p|panel) panel ;; t|test) test ;; h|hotspot) read -r -p "on/off/status? " m; hotspot "$m" ;; 3|ingest) ingest ;; 4|push) push ;;
+      1|status) status ;; 2|start) start ;; p|panel) panel ;; t|test) test ;; s|speed) speed ;; h|hotspot) read -r -p "on/off/status? " m; hotspot "$m" ;; 3|ingest) ingest ;; 4|push) push ;;
       f|fonts) fonts ;; r|reboot) reboot_nano ;; i|install) install ;; a|pair) pair ;;
       n|internet) read -r -p "on/off/status? " m; internet "$m" ;;
       5|bench) bench ;; 6|translations) translations ;; 7|backup) backup ;;
@@ -176,7 +186,7 @@ EOF
 
 case "${1:-}" in
   "") menu ;;
-  status|start|panel|hotspot|fonts|test|ingest|push|bench|translations|backup|install|pair|devices|revoke|internet) f="$1"; shift; "$f" "$@" ;;
+  status|start|panel|hotspot|fonts|test|speed|ingest|push|bench|translations|backup|install|pair|devices|revoke|internet) f="$1"; shift; "$f" "$@" ;;
   shutdown) shutdown_nano ;;
   reboot) reboot_nano ;;
   *) echo "usage: tools/nano.sh [status|start|panel|install|pair|devices|revoke|internet|hotspot|fonts|test|ingest|push|bench|translations|backup|reboot|shutdown]"; exit 2 ;;
