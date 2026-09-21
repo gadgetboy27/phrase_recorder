@@ -11,6 +11,7 @@ contract (speaker, sourceLang, targetLang, sourceText, translatedText, …).
 """
 import json
 import subprocess
+import sys
 import threading
 import time
 from pathlib import Path
@@ -43,18 +44,30 @@ def nllb_available():
     return ctranslate2 is not None and (NLLB_DIR / "model.bin").exists()
 
 
-def nllb_translate(text, src, tgt):
-    """text from our language code src to tgt with NLLB-200 (int8, CPU, ~2 s a sentence), or None."""
+def nllb_load():
+    """Load NLLB once (≈3 s, ≈600 MB). panel_api calls this at start-up so the first patient of the day
+    doesn't pay for it; every translate call goes through it too."""
     global _nllb
-    if not nllb_available() or src not in NLLB_CODES or tgt not in NLLB_CODES or not text:
+    if not nllb_available():
         return None
     with _nllb_lock:
         if _nllb is None:
-            _nllb = (ctranslate2.Translator(str(NLLB_DIR), device="cpu", compute_type="int8", inter_threads=1, intra_threads=4),
+            t0 = time.time()                 # the Orin Nano has 6 cores; leave none idle while a sentence decodes
+            _nllb = (ctranslate2.Translator(str(NLLB_DIR), device="cpu", compute_type="int8", inter_threads=1, intra_threads=6),
                      spm.SentencePieceProcessor(model_file=str(NLLB_DIR / "sentencepiece.bpe.model")))
-        tr, sp = _nllb
+            print(time.strftime("%H:%M:%S"), f"nllb loaded in {time.time() - t0:.1f} s", file=sys.stderr, flush=True)
+    return _nllb
+
+
+def nllb_translate(text, src, tgt, beam=4):
+    """text from our language code src to tgt with NLLB-200 (int8, CPU), or None. beam=4 for drafts
+    nobody is waiting for (~2 s); the live speech path passes beam=2 (~1.3 s, near-identical output)."""
+    if not nllb_available() or src not in NLLB_CODES or tgt not in NLLB_CODES or not text:
+        return None
+    tr, sp = nllb_load()
+    with _nllb_lock:
         toks = [NLLB_CODES[src]] + sp.encode(text, out_type=str) + ["</s>"]
-        out = tr.translate_batch([toks], target_prefix=[[NLLB_CODES[tgt]]], beam_size=4, max_decoding_length=160)
+        out = tr.translate_batch([toks], target_prefix=[[NLLB_CODES[tgt]]], beam_size=beam, max_decoding_length=160)
         out_text = sp.decode([t for t in out[0].hypotheses[0] if t != NLLB_CODES[tgt]]).strip()
         # NLLB signals "could not translate" with ⁇ and/or by echoing the source — that is not a draft
         if not out_text or "⁇" in out_text or out_text.lower().strip(" .!?") == text.lower().strip(" .!?"):

@@ -5,7 +5,14 @@
 #   phrase-panel.service        panel_api.py as a sandboxed systemd service (was an @reboot cron line):
 #                               read-only everything except ~/panel and ~/phrase-recordings, private /tmp,
 #                               no privilege escalation, restarted if it dies.
-#   llama-server.service        Qwen fallback translator, same treatment.
+#   whisper-server.service      whisper.cpp's server with large-v3-turbo held on the GPU, so a transcription
+#                               costs ~1 s instead of ~2.5 s (whisper-cli reloaded the model on every call).
+#                               The API falls back to whisper-cli whenever it is down.
+#   llama-server.service        Qwen fallback translator. Installed but DISABLED since 2026-09-21: NLLB is the
+#                               translator and the 3B took ~2 GB of the 8 GB the resident Whisper now needs.
+#                               `sudo systemctl start llama-server` brings it back for a session.
+#   power button                logind handles the J14 button (HandlePowerKey=poweroff) and the box boots to
+#                               multi-user.target — no GDM to swallow the key, and ~700 MB less RAM in use.
 #   phrase-panel-shutdown.path  the API can't sudo any more, so it touches /run/phrase-panel/shutdown and
 #                               this root unit powers the Nano off.
 #   phrase-panel-wifi.path      the API writes an SSID to /run/phrase-panel/wifi; root switches networks
@@ -46,6 +53,29 @@ ProtectKernelTunables=yes
 ProtectControlGroups=yes
 RestrictSUIDSGID=yes
 # CUDA (whisper-cli) and ALSA need the device nodes; nothing here restricts /dev on purpose.
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+cat > /etc/systemd/system/whisper-server.service <<EOF
+[Unit]
+Description=whisper-server (resident Whisper for the panel API)
+After=network.target
+
+[Service]
+User=$PANEL_USER
+WorkingDirectory=$HOME_DIR/whisper.cpp
+# -fa: flash attention (CUDA build). --host 127.0.0.1: the panel API is the only client; the WAV never leaves the box.
+ExecStart=$HOME_DIR/whisper.cpp/build/bin/whisper-server -m $HOME_DIR/whisper.cpp/models/ggml-large-v3-turbo-q5_0.bin --host 127.0.0.1 --port 8178 -fa -nt
+Restart=on-failure
+RestartSec=5
+StandardOutput=append:$HOME_DIR/whisper-server.log
+StandardError=append:$HOME_DIR/whisper-server.log
+ProtectSystem=strict
+ProtectHome=read-only
+PrivateTmp=yes
+NoNewPrivileges=yes
 
 [Install]
 WantedBy=multi-user.target
@@ -191,6 +221,14 @@ EOF
 chmod 440 /etc/sudoers.d/phrasekit
 visudo -c -f /etc/sudoers.d/phrasekit >/dev/null
 
+# ---- the wired power button (J14 pins 11-12): a short press must be a clean shutdown ----
+# With a desktop session up, gnome-settings-daemon takes the power key from logind and does nothing useful
+# on a headless box, so the Nano boots to multi-user.target (no GDM; `sudo systemctl start gdm` if a
+# screen is ever plugged in) and logind powers off on the key. The iPad's shutdown path is unchanged.
+sed -i 's/^#\?HandlePowerKey=.*/HandlePowerKey=poweroff/' /etc/systemd/logind.conf
+grep -q '^HandlePowerKey=poweroff' /etc/systemd/logind.conf || echo 'HandlePowerKey=poweroff' >> /etc/systemd/logind.conf
+systemctl set-default multi-user.target >/dev/null
+
 # the cron lines the services replace
 crontab -u "$PANEL_USER" -l 2>/dev/null | grep -v -e panel_api.py -e llama-server | crontab -u "$PANEL_USER" - || true
 
@@ -199,8 +237,10 @@ systemctl daemon-reload
 pkill -u "$PANEL_USER" -f "^python3 .*panel_api.py" || true
 pkill -u "$PANEL_USER" -x llama-server || true
 sleep 2
-systemctl enable --now phrase-panel-shutdown.path phrase-panel-wifi.path llama-server.service phrase-panel.service
-systemctl restart llama-server.service phrase-panel.service
+systemctl disable --now llama-server.service 2>/dev/null || true          # kept on disk, off the boot set (see header)
+systemctl enable --now phrase-panel-shutdown.path phrase-panel-wifi.path whisper-server.service phrase-panel.service
+systemctl restart whisper-server.service phrase-panel.service
 sleep 4
 systemctl --no-pager --lines=0 status phrase-panel.service | sed -n 1,3p
-echo "done — services: $(systemctl is-active phrase-panel llama-server phrase-panel-shutdown.path phrase-panel-wifi.path | tr '\n' ' ')"
+echo "done — services: $(systemctl is-active phrase-panel whisper-server phrase-panel-shutdown.path phrase-panel-wifi.path | tr '\n' ' ')  (llama-server: $(systemctl is-active llama-server), disabled by design)"
+echo "power key: $(grep '^HandlePowerKey' /etc/systemd/logind.conf)  default target: $(systemctl get-default)  (logind re-reads its config at the next boot)"

@@ -35,8 +35,8 @@ volunteer's phone ──► batch.zip ──► Mac ─────────�
 | Add phrases | `tools/add_phrase.py` | `--category intake "…"` adds the next key; `--revise p003 "…"` adds a new version. Refreshes `phrases.json` for you. |
 | Draft transcripts | `tools/draft_transcripts.py` | `--lang fa`: Whisper on the Nano transcribes every recording whose phrase has no approved text in that language and files the result as a `draft` golden_set row (`created_by whisper:<model>`) for a reader of the language to approve or reject. Never auto-approves. |
 | Review translations | `tools/translations.py` | `list` drafts, `play` a draft's recording on the Nano, `approve` / `reject`, or `set p003 mi "…"` to enter one directly. |
-| Bench | `tools/bench.py` | The bake-off number. For every approved translation: trims each linked recording to its speech (Silero VAD) and resamples to 16 kHz on the Nano — the original WAV is untouched — transcribes it with whisper-cli, asks the Nano's llama-server to translate the English, and scores both against the approved text (CER/WER, with and without macrons). Report under `~/phrase-recordings/bench/`; derived file + speech boundaries recorded on `audio_samples`. |
-| Nano worker | `nano/asr_worker.py` | The half of bench that runs on the Nano (copied over by `bench.py`). Uses `~/whisper.cpp` (CUDA build, `ggml-large-v3-turbo-q5_0.bin`, `ggml-silero-v6.2.0.bin`), sox, and the llama-server on `127.0.0.1:8080`. |
+| Bench | `tools/bench.py` | The bake-off number. For every approved translation: trims each linked recording to its speech (Silero VAD) and resamples to 16 kHz on the Nano — the original WAV is untouched — transcribes it with Whisper (the resident whisper-server, else whisper-cli), asks the Nano's llama-server to translate the English, and scores both against the approved text (CER/WER, with and without macrons). Report under `~/phrase-recordings/bench/`; derived file + speech boundaries recorded on `audio_samples`. |
+| Nano worker | `nano/asr_worker.py` | The half of bench that runs on the Nano (copied over by `bench.py`). Uses `~/whisper.cpp` (CUDA build, `ggml-large-v3-turbo-q5_0.bin`, `ggml-silero-v6.2.0.bin`), sox, whisper-server on `127.0.0.1:8178` when it is up (nano/install.sh; falls back to whisper-cli), and the llama-server on `127.0.0.1:8080` if started. |
 | Touch panel | `nano/panel.yaml` + `nano/panel_api.py` (+ `panel_drafts.py`, `panel_render.py`, `panel_takes.py`, `panel_admin.py`) | Firmware (ESPHome + LVGL) for the Waveshare ESP32-S3-Touch-LCD-7 and the Nano-side API on `:8765`. Wizard: *I speak…* → language → *Translate to…* → language, then the conversation screen; tapping a phrase turns the device to the patient (their language, a ↻ *Hear it again* button that replays it, preset replies, a mic that becomes Stop with a timer, then a translated-reply screen). Voice order per phrase: native/fluent recording → Piper → Google TTS (yue/ja/ko/pa/tl, cached by `GET /pregen?lang=`) → learner recording → spoken draft (`SPEAK_DRAFTS`) → English with a spoken warning. Drafts come from NLLB-200 on the Nano (Qwen fallback), shown amber until approved; Arabic script is shaped on the Nano, other non-Latin scripts are rendered to PNG by the Nano (`/render`). **+ Add phrase** (after initials + consent) opens a page where a new English phrase is spoken (Whisper), checked on a keyboard and saved straight into Postgres — the take is filed as its English recording; the same page adds a language (from `panel_admin.LANGUAGES`; its Noto font is fetched once, `tools/nano.sh fonts` pre-fetches them all) and enters Record mode, where tapping a phrase records its translation (batch + whisper draft). Languages carry a `script` so the firmware never needs to know a new one. Deploy with `tools/nano.sh panel`; flash once over USB (`esphome run nano/panel.yaml`), then over Wi-Fi. |
 | Backup | `tools/backup.py` | `pg_dump` of the Nano's database (the golden set) plus an rsync mirror of its recordings, into `~/phrase-recordings/backups/`. `--install` schedules it daily at 21:00 via launchd; skips quietly when the Nano is off. Last 30 dumps kept. |
 | Schema | `nano/migrations/` + `nano/apply.sh` | Idempotent migrations on top of the brief's §16 schema. `001` adds the `phrases` table and the recording metadata columns; `002` translations; `003` derived-audio columns. |
@@ -89,14 +89,25 @@ done on the Mac (it has). `tools/backup.py` runs one now; check
 `~/phrase-recordings/backups/backup.log`. Restore with
 `gunzip -c backups/db/<file>.sql.gz | psql interpreter_data`.
 
+**Speed on the Nano:** `tools/nano.sh install` runs whisper-server as a
+service with the model resident on the GPU (a transcription is ~1 s instead
+of ~2.5 s), keeps NLLB loaded in the API, and serves HTTP/1.1 keep-alive so
+the iPad is not re-handshaking TLS on every request. `tools/panel_test.py
+latency` prints the numbers a clinician actually waits for; run it before and
+after a deploy. llama-server (Qwen) stays installed but off — `tools/nano.sh
+start` for a session. The same install makes the wired power button on J14
+pins 11–12 a clean shutdown (logind, `multi-user.target`).
+
 **Scoring the models:** `tools/bench.py --lang mi` after any push or approval.
 Every recording is trimmed + resampled into `<batch>/derived/16k-trim/` on
 the Nano (roughly a quarter of the original size); that copy is what
 Whisper — and later fine-tuning — reads. `--model` swaps the Whisper model,
 `--no-translate` skips the LLM, `--force` re-trims.
 
-**Adding phrases:** on the panel (**+ Add phrase**, say it in English) or
-`tools/add_phrase.py --category intake "What is your date of birth?"`.
+**Adding phrases:** on the panel (**+ Add phrase**, say it in English),
+`tools/add_phrase.py --category intake "What is your date of birth?"`, or a
+whole file at once — `tools/add_phrase.py --batch docs/phrases-2026-09-21.txt`
+(`category | text` per line, `retire pNNN` to take one off the panel).
 Either way Postgres is updated; `tools/nano.sh panel` re-exports
 `public/phrases.json` from it before every deploy — commit and push that so
 the recorder shows the change. Languages likewise: the panel's *Add a

@@ -10,7 +10,7 @@ survives a power cycle. Stdlib only — nothing to install on the Nano.
 Routes (JSON responses; the panel only reads the first ~60 chars of `say`):
   GET  /render?text=&lang=&size=&w=&fg=&bg=&align=   PNG of shaped text for scripts the panel can't draw
   GET  /render/replies?lang=&t0=&s0=&a0=1&t1=…       PNG strip of reply cells (sits behind the panel's buttons)
-  GET  /health                 what the panel depends on: audio card, piper, whisper, llama-server
+  GET  /health                 what the panel depends on: audio card, piper, whisper(-server), NLLB / llama-server
   GET  /phrases?lang=xx&src=yy {languages, categories, phrases:[{key, category, text, src_text,
                                translation, recording}]} — everything the panel needs to build its
                                screen. `lang` is the patient's language, `src` the clinician's.
@@ -26,8 +26,9 @@ Routes (JSON responses; the panel only reads the first ~60 chars of `say`):
                                button so a demo kit can be closed without a laptop)
   POST /panel/record?lang=xx   start recording the USB mic (a second tap restarts the take)
   POST /panel/stop?lang=xx&src=yy&speak=1
-                               stop, transcribe with whisper-cli in xx; when yy ≠ xx and llama-server
-                               is up, translate the transcript into yy and (speak=1) say it with Piper.
+                               stop, transcribe with Whisper in xx; when yy ≠ xx and a translator is
+                               up (NLLB, else llama-server), translate the transcript into yy and
+                               (speak=1) say it with Piper.
   POST /panel/record?lang=xx&phrase=p003&speaker=hp&type=native&consent=1
                                volunteer take of a phrase: on /panel/stop it is filed as a batch +
                                audio_samples row and whisper's text becomes a golden_set draft
@@ -86,7 +87,7 @@ PUBLIC_GET = {"/", "/index.html", "/app.js", "/app.css", "/setup", "/setup.html"
               "/icon.svg", "/icon-192.png", "/icon-512.png", "/ca.crt", "/health", "/render", "/render/replies"}
 PUBLIC_POST = {"/pair"}
 AUDIO_IDS = {}                                            # unguessable id -> Path, for GET /audio/<id>
-WHISPER_LOCK = threading.Lock()                           # one whisper-cli at a time: partials and finals share the GPU
+WHISPER_LOCK = threading.Lock()                           # one Whisper call at a time: partials and finals share the GPU
 AUDIO_DEV = "plughw:0,0"                                # the USB PnP sound device: mic + speaker
 WHISPER_MODEL = "ggml-large-v3-turbo-q5_0.bin"
 PORT = 8765
@@ -260,7 +261,7 @@ def llama_up():
 def to_language(text, language, target="English", src_code=None, tgt_code=None):
     """What a patient said, in the clinician's language: NLLB when we have it, else the llama-server."""
     if src_code and tgt_code:
-        out = panel_drafts.nllb_translate(text, src_code, tgt_code)
+        out = panel_drafts.nllb_translate(text, src_code, tgt_code, beam=2)     # someone is waiting: beam 2
         if out:
             return out
     body = {"messages": [
@@ -453,6 +454,7 @@ def health():
         "audio": Path("/proc/asound/card0").exists(),
         "piper": PIPER.exists(),
         "whisper": (asr_worker.WHISPER / "models" / WHISPER_MODEL).exists(),
+        "whisper_server": asr_worker.server_up(),      # resident model (whisper-server.service); else whisper-cli per call
         "llama": llama_up(),
         "db": panel_takes.db_ok(),
         "drafts_pending": panel_drafts.pending(),
@@ -464,6 +466,12 @@ def health():
 
 
 class Handler(BaseHTTPRequestHandler):
+    # Keep-alive: the default HTTP/1.0 closed the socket after every reply, so each of the iPad's requests
+    # (a partial upload every 3 s while recording) paid a fresh TLS handshake. Every reply here sends a
+    # Content-Length, which is what 1.1 needs; a request body we don't read must close the connection.
+    protocol_version = "HTTP/1.1"
+    timeout = 75                                # an idle kept-alive socket is closed after this; also the per-read limit
+
     def log_message(self, fmt, *args):          # one line per request, our format (the pair is in the query)
         log(self.address_string(), fmt % args)
 
@@ -588,6 +596,7 @@ class Handler(BaseHTTPRequestHandler):
         q = {k: v[0] for k, v in parse_qs(u.query).items()}
         length = int(self.headers.get("Content-Length") or 0)
         if length > MAX_UPLOAD:
+            self.close_connection = True                 # body left unread — it must not become the next request
             return self.reply(413, {"say": "That recording is too long"})
         body = self.rfile.read(length)                   # a WAV for /panel/transcribe; otherwise ignored
         if not self.authed(u, q, PUBLIC_POST):
@@ -712,6 +721,7 @@ class Handler(BaseHTTPRequestHandler):
 
 if __name__ == "__main__":
     threading.Thread(target=beacon, daemon=True).start()
+    threading.Thread(target=panel_drafts.nllb_load, daemon=True).start()     # warm the translator before anyone speaks
     if not panel_admin.devices():
         log("WARNING: no paired devices (~/panel/devices.json) — every non-public request will get 401; run tools/nano.sh panel")
     tls = panel_admin.tls_ensure()

@@ -5,6 +5,7 @@
     tools/panel_test.py glyphs          # static: can the panel's fonts draw every string it may show?
     tools/panel_test.py api             # the Nano API answers correctly for every language
     tools/panel_test.py panel [secs]    # the panel stays up (API port) for N seconds, no crash report
+    tools/panel_test.py latency [wav] [lang]   # what the iPad waits for: keep-alive, /panel/partial, /panel/transcribe
 
 Exit 1 on any failure; each failure names the language / phrase / character. Stdlib only.
 The glyph test reads nano/panel.yaml and asks the Nano for the texts (approved + drafts) so it
@@ -137,8 +138,8 @@ def test_api():
         if len(d["phrases"]) < 20:
             fail(f"{code}: only {len(d['phrases'])} phrases")
         replies = [p for p in d["phrases"] if p["category"] == "patient_replies"]
-        if len(replies) != 7:
-            fail(f"{code}: {len(replies)} preset replies, expected 7")
+        if not 7 <= len(replies) <= 16:          # the Waveshare shows the first 8, the iPad scrolls
+            fail(f"{code}: {len(replies)} preset replies, expected 7-16")
         if code != "en":
             texts = [p.get("translation") or p.get("draft") for p in d["phrases"]]
             n = sum(1 for t in texts if t)
@@ -224,8 +225,58 @@ def test_panel(secs=120):
         print(f"  API port up {ok}/{ok} checks")
 
 
+# ---- 4. latency: the numbers behind "faster" ----------------------------------------------------
+def test_latency(wav=None, lang="en"):
+    """Times what a clinician actually waits for, over the same HTTPS the iPad uses (the Nano's CA):
+    a warm keep-alive request vs a cold one, a live partial, and a full stop→text→translation→audio turn.
+    Run before and after a deploy; the medians are the before/after."""
+    import http.client, ssl, statistics
+    wav = Path(wav) if wav else Path.home() / "phrase-recordings" / "backups" / "nano" / "_tts_en" / "p003_en.wav"
+    if not wav.exists():
+        fail(f"latency: no sample WAV ({wav}); pass one"); return
+    data = wav.read_bytes()
+    host = NANO_TLS.split("//")[1]
+    ctx = ssl.create_default_context()
+    with _req("/ca.crt", token="") as r:
+        ctx.load_verify_locations(cadata=r.read().decode())
+    hdr = {"Authorization": "Bearer " + TOKEN}
+    def timed(conn, method, path, body=None, extra=None):
+        t0 = time.time()
+        conn.request(method, path, body, dict(hdr, **(extra or {})))
+        r = conn.getresponse(); out = r.read()
+        return time.time() - t0, r, out
+    print(f"latency: {wav.name} ({len(data) // 1024} KB) as {lang}, over {NANO_TLS}")
+    # 1. connection reuse: request 1 pays TLS + mDNS; 2..6 should not (HTTP/1.1 keep-alive)
+    conn = http.client.HTTPSConnection(host, context=ctx, timeout=60)
+    cold = timed(conn, "GET", "/health")[0]
+    warm = [timed(conn, "GET", "/health")[0] for _ in range(5)]
+    reused = conn.sock is not None
+    print(f"  /health: cold {cold * 1000:.0f} ms, warm median {statistics.median(warm) * 1000:.0f} ms  (connection kept open: {reused})")
+    if not reused:
+        fail("latency: the server closed the connection after one request (no keep-alive)")
+    # 2. a live partial, three times (the model is warm after the first)
+    parts = []
+    for _ in range(3):
+        dt, r, out = timed(conn, "POST", f"/panel/partial?lang={lang}&raw=1", data, {"Content-Type": "audio/wav"})
+        parts.append(dt)
+    text = json.loads(out).get("text")
+    print(f"  /panel/partial: {', '.join(f'{x:.2f}' for x in parts)} s  → {text!r}")
+    # 3. the whole turn: transcribe + translate into Hindi + Piper, audio returned as URLs
+    turns = []
+    for _ in range(2):
+        dt, r, out = timed(conn, "POST", f"/panel/transcribe?lang={lang}&src=hi&who=clinician&speak=1&client=1&raw=1", data, {"Content-Type": "audio/wav"})
+        turns.append(dt)
+    j = json.loads(out)
+    print(f"  /panel/transcribe → hi + audio: {', '.join(f'{x:.2f}' for x in turns)} s  → {j.get('translated')!r}  audio: {len(j.get('audio') or [])}")
+    h = json.loads(timed(conn, "GET", "/health")[2])
+    print(f"  whisper-server resident: {h.get('whisper_server')}   translator: {h.get('translator')}")
+    conn.close()
+
+
 if __name__ == "__main__":
     what = sys.argv[1] if len(sys.argv) > 1 else "all"
+    if what == "latency":
+        test_latency(*(sys.argv[2:4]))
     if what in ("all", "glyphs"):
         test_glyphs()
     if what in ("all", "api"):

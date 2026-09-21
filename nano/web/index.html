@@ -710,7 +710,7 @@
       const r = await fetch("/health", { headers: { Authorization: "Bearer " + S.token } }); const h = await r.json();
       const s = $("status"); s.classList.remove("bad");
       const w = h.wifi || {};
-      s.textContent = "Nano on " + (w.ssid || "wired") + (w.ip ? " · " + w.ip : "") + "  ·  speech " + (h.whisper && h.piper ? "✓" : "✗") + "  ·  translator " + (h.translator ? "✓ " + h.translator : "starting…") + "  ·  db " + (h.db ? "✓" : "✗") + "  ·  this iPad → " + location.host;
+      s.textContent = "Nano on " + (w.ssid || "wired") + (w.ip ? " · " + w.ip : "") + "  ·  speech " + (h.whisper && h.piper ? (h.whisper_server ? "✓" : "✓ slow (whisper-server down)") : "✗") + "  ·  translator " + (h.translator ? "✓ " + h.translator : "starting…") + "  ·  db " + (h.db ? "✓" : "✗") + "  ·  this iPad → " + location.host;
     } catch (e) { const s = $("status"); s.textContent = "Nano not reachable at " + location.host + " — same Wi-Fi?"; s.classList.add("bad"); }
   }
   setInterval(health, 10000); health();

@@ -1,0 +1,74 @@
+# Phrase bank expansion, 2026-09-21 — apply with: tools/add_phrase.py --batch docs/phrases-2026-09-21.txt
+# Rule used: one idea per phrase, answerable with a preset reply, a gesture or yes/no where possible.
+# Where a new phrase said the same thing as an old one, the more answerable one stays.
+
+# p002 "Do you understand and consent to this emergency procedure?" asked two things at once —
+# replaced by consent: "I need your permission to do this." → "Do you agree?"
+retire p002
+# p009 "We need to monitor your baby's heartbeat continuously." → the plainer examination phrase below;
+# p003 "Please stay as still as possible" covers the CTG situation.
+retire p009
+
+intake | What is your date of birth?
+intake | Are you pregnant?
+intake | How many weeks pregnant are you?
+intake | Do you have any medical conditions?
+intake | Are you taking any medicines?
+intake | Have you had surgery before?
+intake | Who is your next of kin?
+
+allergy | Are you allergic to any medicines?
+allergy | Are you allergic to latex?
+allergy | Are you allergic to any foods?
+allergy | Have you had a bad reaction to anaesthetic before?
+allergy | Tell me if you feel itchy or your lips swell.
+
+symptoms | Point to where it hurts.
+symptoms | Is the pain getting worse?
+symptoms | On a scale of 1 to 10, how bad is the pain?
+symptoms | Do you feel dizzy or faint?
+symptoms | Are you bleeding?
+symptoms | Have your waters broken?
+symptoms | Can you feel the baby moving?
+symptoms | Are you having contractions?
+symptoms | Do you feel sick?
+
+examinations | I am going to check your blood pressure.
+examinations | I am going to listen to your baby's heartbeat.
+examinations | I need to feel your tummy.
+examinations | I need to do an internal examination. Is that okay?
+examinations | This may feel cold.
+examinations | This may hurt for a moment.
+examinations | I need to take some blood.
+
+medication | I am going to give you some pain relief.
+medication | This is an antibiotic.
+medication | This will make you sleepy.
+medication | Tell me if you feel any different after this.
+medication | You can have this every 4 hours.
+
+consent | I need your permission to do this.
+consent | Do you agree?
+consent | You can say no.
+consent | Do you have any questions?
+
+surgeries | You need an operation.
+surgeries | You will be awake but numb from the waist down.
+surgeries | You will be asleep for the operation.
+surgeries | Your partner can come with you.
+surgeries | The operation will take about one hour.
+
+discharge | You can go home today.
+discharge | Come back immediately if the bleeding gets heavier.
+discharge | Come back if you have a fever.
+discharge | Take this medicine twice a day.
+discharge | Your follow-up appointment is in one week.
+discharge | Do you have someone to take you home?
+
+patient_replies | I am pregnant
+patient_replies | I have an allergy
+patient_replies | I feel dizzy
+patient_replies | I need water
+patient_replies | Please slow down
+patient_replies | I want my partner here
+patient_replies | I am scared

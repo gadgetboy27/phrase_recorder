@@ -25,15 +25,15 @@ status() {
     echo "up      : $(uptime -p)  temp $(cat /sys/devices/virtual/thermal/thermal_zone0/temp | cut -c1-2)°C"
     echo "memory  : $(free -m | awk "/Mem/{printf \"%d/%d MB used\", \$3, \$2}")   disk $(df -h / | awk "NR==2{print \$4}") free"
     pg_isready -q -h localhost && echo "postgres: ok" || echo "postgres: DOWN"
-    if pgrep -x llama-server >/dev/null; then echo "llm     : llama-server running ($(pgrep -a llama-server | grep -o "[^/]*\.gguf"))"; else echo "llm     : llama-server NOT running  → menu: start"; fi
-    echo "asr     : whisper.cpp $(ls ~/whisper.cpp/models/ggml-large-v3-turbo-q5_0.bin >/dev/null 2>&1 && echo ready || echo "MODEL MISSING")"
+    echo "asr     : whisper.cpp $(ls ~/whisper.cpp/models/ggml-large-v3-turbo-q5_0.bin >/dev/null 2>&1 && echo ready || echo "MODEL MISSING"), whisper-server $(curl -s -o /dev/null -m 2 -w "%{http_code}" localhost:8178/ | grep -q "^[234]" && echo "resident (fast)" || echo "DOWN → whisper-cli per call (slow)")"
+    echo "mt      : NLLB $(ls ~/models/nllb-600M-ct2-int8/model.bin >/dev/null 2>&1 && echo ready || echo MISSING); llama-server (Qwen fallback, off by design) $(pgrep -x llama-server >/dev/null && echo running || echo stopped)"
     echo "panel   : $(curl -s -m 2 localhost:8765/health || echo "api NOT running  → menu: panel")"
     echo "audio   : $(find ~/phrase-recordings -maxdepth 1 -mindepth 1 -type d -not -name "_*" -not -name ".*" | wc -l) batch dir(s)"
   '
   echo "golden  : $(psql "$PG_DSN" -At -c "select count(*)||' approved, '||count(*) filter (where status='draft')||' draft' from golden_set where status in ('approved','draft')" 2>/dev/null || echo "psql failed")"
 }
 
-start() {
+start() {                                   # the Qwen fallback, for a session only — NLLB is the translator (install.sh)
   need_up || return
   ssh "$NANO_SSH" '
     if pgrep -x llama-server >/dev/null; then echo "llama-server already running"; exit 0; fi

@@ -14,8 +14,9 @@ For every file:
   2. sox cuts that span (+ padding) and resamples to 16 kHz mono into
      <batch>/derived/16k-trim/<file>. The original is never modified.
      Skipped when the derived file already exists unless "force".
-  3. whisper-cli transcribes the derived file (one process for all files,
-     so the model loads once).
+  3. whisper-server (resident, model already on the GPU — nano/install.sh) transcribes
+     each file; if it is not running, whisper-cli does (one process for all files, so
+     the model loads once).
 For every translate item: ask the llama-server already running on :8080.
 
 Result (JSON on stdout): {"files": [...per file...], "translations": [...], "timings": {...}}
@@ -26,11 +27,16 @@ import re
 import subprocess
 import sys
 import time
+import urllib.error
 import urllib.request
 from pathlib import Path
 
 WHISPER = Path.home() / "whisper.cpp"
 VAD_MODEL = WHISPER / "models" / "ggml-silero-v6.2.0.bin"
+# whisper.cpp's server, started at boot by whisper-server.service with the model held on the GPU:
+# ~1 s a call instead of ~2.5 s, because whisper-cli reloaded 1.6 GB of weights every time it ran.
+WHISPER_URL = "http://127.0.0.1:8178"
+SERVER_MODEL = "ggml-large-v3-turbo-q5_0.bin"     # what the unit loads; a bench of another model goes through whisper-cli
 LLAMA_URL = "http://127.0.0.1:8080/v1/chat/completions"
 # Whisper's language ids don't line up with ours everywhere: Dari is decoded as
 # Farsi; Tongan and Samoan aren't in Whisper at all (no drafts, no scores —
@@ -71,10 +77,53 @@ def derive(src, dst, start_ms, end_ms):
     )
 
 
+_server_seen = [0.0, False]         # (checked at, was up) — health is asked at most every 10 s
+
+
+def server_up():
+    """Is whisper-server answering? Cached for 10 s so the API's health/beacon don't hammer it."""
+    now = time.time()
+    if now - _server_seen[0] < 10:
+        return _server_seen[1]
+    try:
+        with urllib.request.urlopen(WHISPER_URL + "/", timeout=1) as r:   # any answer at all — the root is a demo page
+            up = r.status < 500
+    except urllib.error.HTTPError as e:
+        up = e.code < 500
+    except Exception:
+        up = False
+    _server_seen[:] = [now, up]
+    return up
+
+
+def _server_transcribe(language, wav):
+    """One file through whisper-server's /inference (multipart, like curl -F). Raises on any failure so
+    the caller can fall back to whisper-cli."""
+    boundary = "----phrasekit" + str(int(time.time() * 1000))
+    fields = {"language": language, "response_format": "json", "temperature": "0.0", "no_timestamps": "true"}
+    body = b""
+    for k, v in fields.items():
+        body += f"--{boundary}\r\nContent-Disposition: form-data; name=\"{k}\"\r\n\r\n{v}\r\n".encode()
+    body += (f"--{boundary}\r\nContent-Disposition: form-data; name=\"file\"; filename=\"{Path(wav).name}\"\r\n"
+             "Content-Type: audio/wav\r\n\r\n").encode() + Path(wav).read_bytes() + f"\r\n--{boundary}--\r\n".encode()
+    req = urllib.request.Request(WHISPER_URL + "/inference", body,
+                                 {"Content-Type": f"multipart/form-data; boundary={boundary}", "Content-Length": str(len(body))})
+    with urllib.request.urlopen(req, timeout=120) as r:
+        return json.load(r)["text"].strip()
+
+
 def transcribe(model, language, wavs):
-    """whisper-cli over all files at once; returns {wav: text}. Writes then removes <wav>.json sidecars."""
+    """{wav: text} for every file. whisper-server when it is up (per file, model resident); otherwise
+    whisper-cli over all files at once, which writes then removes <wav>.json sidecars. `model` only
+    is honoured by the cli path; the server only ever serves SERVER_MODEL."""
     if not wavs:
         return {}
+    if model == SERVER_MODEL and server_up():
+        try:
+            return {str(w): _server_transcribe(language, w) for w in wavs}
+        except Exception as e:                     # server died / rejected the file: the cli still works
+            log("whisper-server failed, using whisper-cli:", repr(e))
+            _server_seen[:] = [time.time(), False]
     cmd = [str(WHISPER / "build/bin/whisper-cli"), "-m", str(WHISPER / "models" / model),
            "-l", language, "-np", "-nt", "-oj"]
     for w in wavs:
