@@ -46,6 +46,7 @@ import sys
 import threading
 import time
 import urllib.request
+import wave
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlparse, parse_qs
@@ -55,6 +56,10 @@ try:                                    # pip3 install --user gTTS — Google's 
     from gtts import gTTS
 except ImportError:
     gTTS = None
+try:                                    # piper-tts in-process: the voice stays loaded (0.3 s a sentence; the
+    from piper import PiperVoice        # command line reloaded onnxruntime + voice every call, ~3.9 s)
+except ImportError:
+    PiperVoice = None
 try:                                    # pip3 install --user arabic-reshaper python-bidi
     import arabic_reshaper
     from bidi.algorithm import get_display
@@ -169,6 +174,37 @@ class Audio:
         self.recorder = None
         self.take = None
         self.take_meta = None       # None for a free transcription, else the volunteer/phrase context
+        self.voices = {}            # piper voice name -> loaded PiperVoice (≈2 s each, once)
+        self.voices_lock = threading.Lock()
+
+    def piper(self, voice, text, wav):
+        """Render text with a Piper voice into wav. In-process when the piper module is importable
+        (voice cached after the first use), else the piper command as before."""
+        if PiperVoice is None:
+            subprocess.run([str(PIPER), "--model", str(VOICES / f"{voice}.onnx"), "--output_file", str(wav)],
+                           input=text, text=True, check=True, capture_output=True)
+            return
+        with self.voices_lock:                  # one synthesis at a time: onnxruntime sessions are not re-entrant here
+            v = self.voices.get(voice)
+            if v is None:
+                t0 = time.time()
+                v = self.voices[voice] = PiperVoice.load(str(VOICES / f"{voice}.onnx"))
+                log(f"piper voice {voice} loaded in {time.time() - t0:.1f} s")
+            wav.parent.mkdir(parents=True, exist_ok=True)
+            tmp = wav.with_suffix(".part.wav")
+            with wave.open(str(tmp), "wb") as w:
+                v.synthesize_wav(text, w)
+            tmp.replace(wav)                    # never a half-written file under the cached name
+
+    def warm_voices(self, langs=("en",)):
+        """Load the voices these languages use (each ≈2 s, ≈100 MB) so the first spoken translation is not
+        the slow one: English at start-up, the pair's languages when a session starts."""
+        for voice in dict.fromkeys(VOICE[l] for l in langs if l in VOICE):
+            if voice not in self.voices and (VOICES / f"{voice}.onnx").exists():
+                try:
+                    self.piper(voice, "Ready.", WORK / "tts" / f"_warm_{voice}.wav")
+                except Exception as e:
+                    log(f"piper warm-up {voice} failed:", repr(e))
 
     def synth(self, text, lang):
         """WAV for text in lang: Piper when it has the voice, else Google (cached), else Piper English."""
@@ -186,8 +222,7 @@ class Audio:
         wav = WORK / "tts" / f"{voice}_{h}.wav"
         if not wav.exists():
             wav.parent.mkdir(parents=True, exist_ok=True)
-            subprocess.run([str(PIPER), "--model", str(VOICES / f"{voice}.onnx"), "--output_file", str(wav)],
-                           input=text, text=True, check=True, capture_output=True)
+            self.piper(voice, text, wav)
         return wav
 
     def say(self, text, lang, then=None, client=False):
@@ -430,7 +465,7 @@ def beacon():
     while True:
         try:
             if tick % 5 == 0:                                   # health every 15 s: it runs psql and reads the phrase file
-                full = health()
+                full = health(max_age=0)
                 h = {"whisper": full["whisper"], "piper": full["piper"], "translator": full["translator"], "db": full["db"]}
             tick += 1
             out = subprocess.run(["ip", "-4", "-o", "addr"], capture_output=True, text=True).stdout
@@ -449,10 +484,25 @@ def beacon():
         time.sleep(3)
 
 
-def health():
+_health = [0.0, None]        # (computed at, dict) — see health()
+
+
+def health(max_age=5):
+    """What the panel depends on. Computing it runs psql and nmcli, so it is cached for max_age seconds:
+    on 2026-09-22 a client polled it 15×/s for three minutes after boot and polkitd/psql ate the CPU
+    the translator needed. The beacon and GET /health share the cache; max_age=0 forces a fresh one."""
+    if _health[1] is not None and time.time() - _health[0] < max_age:
+        return _health[1]
+    h = _health_now()
+    _health[:] = [time.time(), h]
+    return h
+
+
+def _health_now():
     return {
         "audio": Path("/proc/asound/card0").exists(),
-        "piper": PIPER.exists(),
+        "piper": PIPER.exists() or PiperVoice is not None,
+        "piper_resident": PiperVoice is not None,      # voices stay loaded in the API (0.3 s a sentence, not ~4 s)
         "whisper": (asr_worker.WHISPER / "models" / WHISPER_MODEL).exists(),
         "whisper_server": asr_worker.server_up(),      # resident model (whisper-server.service); else whisper-cli per call
         "llama": llama_up(),
@@ -615,6 +665,7 @@ class Handler(BaseHTTPRequestHandler):
         try:
             if action == "session":
                 sid = panel_drafts.start_session(q.get("src", "en"), q.get("dst", "?"))
+                threading.Thread(target=audio.warm_voices, args=((q.get("src", "en"), q.get("dst", "")),), daemon=True).start()
                 return self.reply(200, {"say": "Session started", "session": sid})
             if action.startswith("reply/"):                           # preset patient reply → clinician's language
                 phrases, names = load_phrases()
@@ -722,6 +773,7 @@ class Handler(BaseHTTPRequestHandler):
 if __name__ == "__main__":
     threading.Thread(target=beacon, daemon=True).start()
     threading.Thread(target=panel_drafts.nllb_load, daemon=True).start()     # warm the translator before anyone speaks
+    threading.Thread(target=audio.warm_voices, daemon=True).start()          # and the voices
     if not panel_admin.devices():
         log("WARNING: no paired devices (~/panel/devices.json) — every non-public request will get 401; run tools/nano.sh panel")
     tls = panel_admin.tls_ensure()

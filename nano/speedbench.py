@@ -148,7 +148,7 @@ def bench_nllb():
                 t0 = time.time(); out = panel_drafts.nllb_translate(s, "en", tgt, beam=beam); r[f"beam{beam}_s"] = time.time() - t0
                 r[f"beam{beam}"] = out
             res["rows"].append(r)
-            flag = "same" if r["beam4"] == r["beam2"] else "differs"
+            flag = "same" if r["beam4"] == r["beam2"] else "differs"       # both now sentence-by-sentence
             note(f"[{tgt}] beam4 {r['beam4_s']:.2f} s / beam2 {r['beam2_s']:.2f} s ({flag}): {s}")
             if flag == "differs":
                 note(f"      beam4: {r['beam4']}\n      beam2: {r['beam2']}")
@@ -164,8 +164,20 @@ def bench_piper():
         subprocess.run([str(PIPER), "--model", str(VOICE), "--output_file", str(out)],
                        input=f"Speed check {time.time():.0f}.", text=True, check=True, capture_output=True)
     ts, _ = timed(run, n=2)
-    note(f"uncached sentence: {', '.join(f'{t:.2f}' for t in ts)} s (a process + voice load each time; round two makes this resident)")
-    return {"s": ts}
+    note(f"command line, uncached sentence: {', '.join(f'{t:.2f}' for t in ts)} s (a process + voice load each time — what the API did until 2026-09-22)")
+    res = {"s": ts}
+    try:
+        import wave
+        from piper import PiperVoice
+    except ImportError as e:
+        note(f"piper module not importable in-process ({e}); the API keeps using the command line"); return res
+    t0 = time.time(); v = PiperVoice.load(str(VOICE)); res["load_s"] = time.time() - t0
+    def run2():
+        with wave.open("/tmp/speed_piper2.wav", "wb") as w:
+            v.synthesize_wav(f"Speed check {time.time():.0f}.", w)
+    res["inproc_s"], _ = timed(run2, n=3, warm=1)
+    note(f"in-process: voice load {res['load_s']:.2f} s once, then {', '.join(f'{t:.2f}' for t in res['inproc_s'])} s a sentence")
+    return res
 
 
 def bench_http():
@@ -221,7 +233,8 @@ def main():
         diff = sum(1 for x in report["nllb"]["rows"] if x["beam4"] != x["beam2"])
         print(f"  nllb: beam4 {b4:.2f} s → beam2 {b2:.2f} s per sentence; {diff}/{len(report['nllb']['rows'])} outputs differ; load {report['nllb']['load_s']:.1f} s")
     if report["piper"].get("s"):
-        print(f"  piper: {statistics.median(report['piper']['s']):.2f} s per uncached sentence")
+        inp = f" → in-process {statistics.median(report['piper']['inproc_s']):.2f} s" if report["piper"].get("inproc_s") else ""
+        print(f"  piper: command line {statistics.median(report['piper']['s']):.2f} s per uncached sentence{inp}")
     if report["http"].get("health_ms"):
         print(f"  http: {statistics.median(report['http']['health_ms']):.0f} ms per new local connection; keep-alive today: {report['http']['keepalive']}")
     print(f"  report: {p}")

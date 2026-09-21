@@ -10,6 +10,7 @@ Session log: one JSON line per turn in ~/panel/sessions/<session>.jsonl — the 
 contract (speaker, sourceLang, targetLang, sourceText, translatedText, …).
 """
 import json
+import re
 import subprocess
 import sys
 import threading
@@ -65,14 +66,24 @@ def nllb_translate(text, src, tgt, beam=4):
     if not nllb_available() or src not in NLLB_CODES or tgt not in NLLB_CODES or not text:
         return None
     tr, sp = nllb_load()
+    # NLLB is a sentence model: given "Your baby's heart rate has dropped. This is an emergency." it
+    # translated the first sentence and dropped the second (Māori, 2026-09-21 bench). One sentence per
+    # row, all rows in one batched call (cheaper than one call each), joined back in order.
+    sents = [x for x in re.split(r"(?<=[.!?。！？])\s+", text.strip()) if x]
+    if not sents:
+        return None
     with _nllb_lock:
-        toks = [NLLB_CODES[src]] + sp.encode(text, out_type=str) + ["</s>"]
-        out = tr.translate_batch([toks], target_prefix=[[NLLB_CODES[tgt]]], beam_size=beam, max_decoding_length=160)
-        out_text = sp.decode([t for t in out[0].hypotheses[0] if t != NLLB_CODES[tgt]]).strip()
-        # NLLB signals "could not translate" with ⁇ and/or by echoing the source — that is not a draft
-        if not out_text or "⁇" in out_text or out_text.lower().strip(" .!?") == text.lower().strip(" .!?"):
+        batch = [[NLLB_CODES[src]] + sp.encode(x, out_type=str) + ["</s>"] for x in sents]
+        outs = tr.translate_batch(batch, target_prefix=[[NLLB_CODES[tgt]]] * len(batch), beam_size=beam, max_decoding_length=160)
+    parts = []
+    for x, o in zip(sents, outs):
+        out_text = sp.decode([t for t in o.hypotheses[0] if t != NLLB_CODES[tgt]]).strip()
+        # NLLB signals "could not translate" with ⁇ and/or by echoing the source — that is not a draft.
+        # One failed sentence fails the whole text: a partial translation is worse than none here.
+        if not out_text or "⁇" in out_text or out_text.lower().strip(" .!?") == x.lower().strip(" .!?"):
             return None
-        return out_text
+        parts.append(out_text)
+    return " ".join(parts)
 
 _lock = threading.Lock()
 _cache = json.loads(CACHE.read_text()) if CACHE.exists() else {}
