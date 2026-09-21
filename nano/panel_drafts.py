@@ -120,21 +120,25 @@ def request(phrases, lang, lang_label, llama_up):
         for p in todo:
             _pending.add(_key(p, lang))
     if _worker is None or not _worker.is_alive():
-        _worker = threading.Thread(target=_run, args=(todo, lang, lang_label), daemon=True)
+        _worker = threading.Thread(target=_run, args=(todo, lang, lang_label, llama_up), daemon=True)
         _worker.start()
     else:
-        threading.Thread(target=_run, args=(todo, lang, lang_label), daemon=True).start()
+        threading.Thread(target=_run, args=(todo, lang, lang_label, llama_up), daemon=True).start()
 
 
-def _run(todo, lang, lang_label):
+def _run(todo, lang, lang_label, llama_up=False):
     q = push.sql_str
     for p in todo:
         try:
             text, model = nllb_translate(p["text"], "en", lang), NLLB
-            if not text:
+            if not text and llama_up:
                 text, model = asr_worker.translate(p["text"], lang_label), QWEN
         except Exception as e:                        # engine down mid-way: leave it for next time
             print("draft failed:", p["key"], lang, repr(e), flush=True)
+            with _lock:
+                _pending.discard(_key(p, lang))
+            continue
+        if not text:                                  # nothing could translate it (e.g. Tongan): not a draft, not an error
             with _lock:
                 _pending.discard(_key(p, lang))
             continue

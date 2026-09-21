@@ -294,11 +294,14 @@ def llama_up():
 
 
 def to_language(text, language, target="English", src_code=None, tgt_code=None):
-    """What a patient said, in the clinician's language: NLLB when we have it, else the llama-server."""
+    """What a patient said, in the clinician's language: NLLB when we have it, else the llama-server if it
+    happens to be running (off by default since 2026-09-22), else None — never a 500 for an untranslatable line."""
     if src_code and tgt_code:
         out = panel_drafts.nllb_translate(text, src_code, tgt_code, beam=2)     # someone is waiting: beam 2
         if out:
             return out
+    if not llama_up():
+        return None
     body = {"messages": [
         {"role": "system", "content": f"Translate the patient's {language} sentence into plain {target}. "
                                       "Reply with the translation only."},
@@ -436,8 +439,11 @@ def finish_take(take, meta, q, lang, client=False, device=panel_takes.PANEL_DEVI
     if text and lang != src and (llama_up() or panel_drafts.nllb_available()):
         names = load_phrases()[1]
         out["translated"] = to_language(text, names.get(lang, lang), names.get(src, "English"), lang, src)
-        out["say"] = f"{shape(text, lang)} → {shape(out['translated'], src)}"
-        if q.get("speak") == "1" and has_voice(src):
+        if not out["translated"]:                                          # NLLB gave up (echo / ⁇ / no model for it)
+            out["say"] = f"{shape(text, lang)}  (could not translate that)"
+        else:
+            out["say"] = f"{shape(text, lang)} → {shape(out['translated'], src)}"
+        if out["translated"] and q.get("speak") == "1" and has_voice(src):
             w = audio.say(out["translated"], src, client=client)
             if client:
                 out["audio"] = [serve_audio(x) for x in w]
@@ -500,7 +506,7 @@ def health(max_age=5):
 
 def _health_now():
     return {
-        "audio": Path("/proc/asound/card0").exists(),
+        "audio": "USB" in Path("/proc/asound/cards").read_text() if Path("/proc/asound/cards").exists() else False,   # the USB mic/speaker, not the HDMI card
         "piper": PIPER.exists() or PiperVoice is not None,
         "piper_resident": PiperVoice is not None,      # voices stay loaded in the API (0.3 s a sentence, not ~4 s)
         "whisper": (asr_worker.WHISPER / "models" / WHISPER_MODEL).exists(),

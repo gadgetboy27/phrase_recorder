@@ -129,13 +129,6 @@
       "translations": {}
     },
     {
-      "key": "p002",
-      "version": 1,
-      "category": "obstetric_emergency",
-      "text": "Do you understand and consent to this emergency procedure?",
-      "translations": {}
-    },
-    {
       "key": "p003",
       "version": 1,
       "category": "obstetric_emergency",
@@ -179,13 +172,6 @@
       "version": 1,
       "category": "obstetric_emergency",
       "text": "The baby is coming now, you need to push.",
-      "translations": {}
-    },
-    {
-      "key": "p009",
-      "version": 1,
-      "category": "obstetric_emergency",
-      "text": "We need to monitor your baby's heartbeat continuously.",
       "translations": {}
     },
     {
@@ -284,6 +270,391 @@
       "version": 1,
       "category": "panel_ui",
       "text": "Hear it again",
+      "translations": {}
+    },
+    {
+      "key": "p024",
+      "version": 1,
+      "category": "intake",
+      "text": "What is your date of birth?",
+      "translations": {}
+    },
+    {
+      "key": "p025",
+      "version": 1,
+      "category": "intake",
+      "text": "Are you pregnant?",
+      "translations": {}
+    },
+    {
+      "key": "p026",
+      "version": 1,
+      "category": "intake",
+      "text": "How many weeks pregnant are you?",
+      "translations": {}
+    },
+    {
+      "key": "p027",
+      "version": 1,
+      "category": "intake",
+      "text": "Do you have any medical conditions?",
+      "translations": {}
+    },
+    {
+      "key": "p028",
+      "version": 1,
+      "category": "intake",
+      "text": "Are you taking any medicines?",
+      "translations": {}
+    },
+    {
+      "key": "p029",
+      "version": 1,
+      "category": "intake",
+      "text": "Have you had surgery before?",
+      "translations": {}
+    },
+    {
+      "key": "p030",
+      "version": 1,
+      "category": "intake",
+      "text": "Who is your next of kin?",
+      "translations": {}
+    },
+    {
+      "key": "p031",
+      "version": 1,
+      "category": "allergy",
+      "text": "Are you allergic to any medicines?",
+      "translations": {}
+    },
+    {
+      "key": "p032",
+      "version": 1,
+      "category": "allergy",
+      "text": "Are you allergic to latex?",
+      "translations": {}
+    },
+    {
+      "key": "p033",
+      "version": 1,
+      "category": "allergy",
+      "text": "Are you allergic to any foods?",
+      "translations": {}
+    },
+    {
+      "key": "p034",
+      "version": 1,
+      "category": "allergy",
+      "text": "Have you had a bad reaction to anaesthetic before?",
+      "translations": {}
+    },
+    {
+      "key": "p035",
+      "version": 1,
+      "category": "allergy",
+      "text": "Tell me if you feel itchy or your lips swell.",
+      "translations": {}
+    },
+    {
+      "key": "p036",
+      "version": 1,
+      "category": "symptoms",
+      "text": "Point to where it hurts.",
+      "translations": {}
+    },
+    {
+      "key": "p037",
+      "version": 1,
+      "category": "symptoms",
+      "text": "Is the pain getting worse?",
+      "translations": {}
+    },
+    {
+      "key": "p038",
+      "version": 1,
+      "category": "symptoms",
+      "text": "On a scale of 1 to 10, how bad is the pain?",
+      "translations": {}
+    },
+    {
+      "key": "p039",
+      "version": 1,
+      "category": "symptoms",
+      "text": "Do you feel dizzy or faint?",
+      "translations": {}
+    },
+    {
+      "key": "p040",
+      "version": 1,
+      "category": "symptoms",
+      "text": "Are you bleeding?",
+      "translations": {}
+    },
+    {
+      "key": "p041",
+      "version": 1,
+      "category": "symptoms",
+      "text": "Have your waters broken?",
+      "translations": {}
+    },
+    {
+      "key": "p042",
+      "version": 1,
+      "category": "symptoms",
+      "text": "Can you feel the baby moving?",
+      "translations": {}
+    },
+    {
+      "key": "p043",
+      "version": 1,
+      "category": "symptoms",
+      "text": "Are you having contractions?",
+      "translations": {}
+    },
+    {
+      "key": "p044",
+      "version": 1,
+      "category": "symptoms",
+      "text": "Do you feel sick?",
+      "translations": {}
+    },
+    {
+      "key": "p045",
+      "version": 1,
+      "category": "examinations",
+      "text": "I am going to check your blood pressure.",
+      "translations": {}
+    },
+    {
+      "key": "p046",
+      "version": 1,
+      "category": "examinations",
+      "text": "I am going to listen to your baby's heartbeat.",
+      "translations": {}
+    },
+    {
+      "key": "p047",
+      "version": 1,
+      "category": "examinations",
+      "text": "I need to feel your tummy.",
+      "translations": {}
+    },
+    {
+      "key": "p048",
+      "version": 1,
+      "category": "examinations",
+      "text": "I need to do an internal examination. Is that okay?",
+      "translations": {}
+    },
+    {
+      "key": "p049",
+      "version": 1,
+      "category": "examinations",
+      "text": "This may feel cold.",
+      "translations": {}
+    },
+    {
+      "key": "p050",
+      "version": 1,
+      "category": "examinations",
+      "text": "This may hurt for a moment.",
+      "translations": {}
+    },
+    {
+      "key": "p051",
+      "version": 1,
+      "category": "examinations",
+      "text": "I need to take some blood.",
+      "translations": {}
+    },
+    {
+      "key": "p052",
+      "version": 1,
+      "category": "medication",
+      "text": "I am going to give you some pain relief.",
+      "translations": {}
+    },
+    {
+      "key": "p053",
+      "version": 1,
+      "category": "medication",
+      "text": "This is an antibiotic.",
+      "translations": {}
+    },
+    {
+      "key": "p054",
+      "version": 1,
+      "category": "medication",
+      "text": "This will make you sleepy.",
+      "translations": {}
+    },
+    {
+      "key": "p055",
+      "version": 1,
+      "category": "medication",
+      "text": "Tell me if you feel any different after this.",
+      "translations": {}
+    },
+    {
+      "key": "p056",
+      "version": 1,
+      "category": "medication",
+      "text": "You can have this every 4 hours.",
+      "translations": {}
+    },
+    {
+      "key": "p057",
+      "version": 1,
+      "category": "consent",
+      "text": "I need your permission to do this.",
+      "translations": {}
+    },
+    {
+      "key": "p058",
+      "version": 1,
+      "category": "consent",
+      "text": "Do you agree?",
+      "translations": {}
+    },
+    {
+      "key": "p059",
+      "version": 1,
+      "category": "consent",
+      "text": "You can say no.",
+      "translations": {}
+    },
+    {
+      "key": "p060",
+      "version": 1,
+      "category": "consent",
+      "text": "Do you have any questions?",
+      "translations": {}
+    },
+    {
+      "key": "p061",
+      "version": 1,
+      "category": "surgeries",
+      "text": "You need an operation.",
+      "translations": {}
+    },
+    {
+      "key": "p062",
+      "version": 1,
+      "category": "surgeries",
+      "text": "You will be awake but numb from the waist down.",
+      "translations": {}
+    },
+    {
+      "key": "p063",
+      "version": 1,
+      "category": "surgeries",
+      "text": "You will be asleep for the operation.",
+      "translations": {}
+    },
+    {
+      "key": "p064",
+      "version": 1,
+      "category": "surgeries",
+      "text": "Your partner can come with you.",
+      "translations": {}
+    },
+    {
+      "key": "p065",
+      "version": 1,
+      "category": "surgeries",
+      "text": "The operation will take about one hour.",
+      "translations": {}
+    },
+    {
+      "key": "p066",
+      "version": 1,
+      "category": "discharge",
+      "text": "You can go home today.",
+      "translations": {}
+    },
+    {
+      "key": "p067",
+      "version": 1,
+      "category": "discharge",
+      "text": "Come back immediately if the bleeding gets heavier.",
+      "translations": {}
+    },
+    {
+      "key": "p068",
+      "version": 1,
+      "category": "discharge",
+      "text": "Come back if you have a fever.",
+      "translations": {}
+    },
+    {
+      "key": "p069",
+      "version": 1,
+      "category": "discharge",
+      "text": "Take this medicine twice a day.",
+      "translations": {}
+    },
+    {
+      "key": "p070",
+      "version": 1,
+      "category": "discharge",
+      "text": "Your follow-up appointment is in one week.",
+      "translations": {}
+    },
+    {
+      "key": "p071",
+      "version": 1,
+      "category": "discharge",
+      "text": "Do you have someone to take you home?",
+      "translations": {}
+    },
+    {
+      "key": "p072",
+      "version": 1,
+      "category": "patient_replies",
+      "text": "I am pregnant",
+      "translations": {}
+    },
+    {
+      "key": "p073",
+      "version": 1,
+      "category": "patient_replies",
+      "text": "I have an allergy",
+      "translations": {}
+    },
+    {
+      "key": "p074",
+      "version": 1,
+      "category": "patient_replies",
+      "text": "I feel dizzy",
+      "translations": {}
+    },
+    {
+      "key": "p075",
+      "version": 1,
+      "category": "patient_replies",
+      "text": "I need water",
+      "translations": {}
+    },
+    {
+      "key": "p076",
+      "version": 1,
+      "category": "patient_replies",
+      "text": "Please slow down",
+      "translations": {}
+    },
+    {
+      "key": "p077",
+      "version": 1,
+      "category": "patient_replies",
+      "text": "I want my partner here",
+      "translations": {}
+    },
+    {
+      "key": "p078",
+      "version": 1,
+      "category": "patient_replies",
+      "text": "I am scared",
       "translations": {}
     }
   ]
