@@ -3,7 +3,7 @@
 #
 #   tools/nano.sh            # interactive menu
 #   tools/nano.sh status     # or any item by name: status start panel install pair devices revoke internet hotspot fonts test speed
-#                            #                       ingest push bench translations backup reboot shutdown
+#                            #                       ingest push bench calibrate translations backup reboot shutdown
 #
 # Sets the env the other tools need (NANO_SSH, NANO_DEST, PG_DSN, libpq on PATH)
 # so nothing has to be exported by hand. Password for Postgres comes from ~/.pgpass.
@@ -120,6 +120,10 @@ speed() {
   scp -q nano/speedbench.py nano/asr_worker.py nano/panel_drafts.py tools/push.py "$NANO_SSH:panel_speed/"
   ssh "$NANO_SSH" 'cd ~/panel_speed && python3 speedbench.py'
 }
+# How far is NLLB from professional human translations, per language? Answers "which drafts do I read
+# first". Needs the corpora once (`tools/calibrate.py --fetch`, ~40 MB into ~/phrase-recordings). See
+# tools/calibrate.py. Resumable — each language is cached, so a shut-down Nano loses nothing.
+calibrate()    { need_up && tools/calibrate.py "$@"; }
 # One-time root setup on the Nano: sandboxed systemd services, shutdown path unit, internet on/off rule.
 # Asks for your password on the Nano (nano/install.sh explains each piece).
 install()      { need_up && scp -q nano/install.sh "$NANO_SSH:panel/install.sh" && ssh -t "$NANO_SSH" 'sudo bash ~/panel/install.sh'; }
@@ -167,6 +171,7 @@ menu() {
   3) ingest        validate zips/WAVs in ~/Downloads → staged/
   4) push          staged batches → Nano
   5) bench         score Whisper + Qwen against the golden set
+  c) calibrate     how far NLLB is from human translators, per language (which drafts to read first)
   6) translations  drafts awaiting review (Whisper drafts: tools/draft_transcripts.py --lang xx)
   7) backup        pg_dump + recordings mirror → Mac
   8) shutdown      (offers a backup first)
@@ -177,7 +182,7 @@ EOF
       1|status) status ;; 2|start) start ;; p|panel) panel ;; t|test) test ;; s|speed) speed ;; h|hotspot) read -r -p "on/off/status? " m; hotspot "$m" ;; 3|ingest) ingest ;; 4|push) push ;;
       f|fonts) fonts ;; r|reboot) reboot_nano ;; i|install) install ;; a|pair) pair ;;
       n|internet) read -r -p "on/off/status? " m; internet "$m" ;;
-      5|bench) bench ;; 6|translations) translations ;; 7|backup) backup ;;
+      5|bench) bench ;; c|calibrate) calibrate ;; 6|translations) translations ;; 7|backup) backup ;;
       8|shutdown) shutdown_nano ;; q|quit|"") break ;;
       *) echo "?" ;;
     esac
@@ -186,7 +191,7 @@ EOF
 
 case "${1:-}" in
   "") menu ;;
-  status|start|panel|hotspot|fonts|test|speed|ingest|push|bench|translations|backup|install|pair|devices|revoke|internet) f="$1"; shift; "$f" "$@" ;;
+  status|start|panel|hotspot|fonts|test|speed|calibrate|ingest|push|bench|translations|backup|install|pair|devices|revoke|internet) f="$1"; shift; "$f" "$@" ;;
   shutdown) shutdown_nano ;;
   reboot) reboot_nano ;;
   *) echo "usage: tools/nano.sh [status|start|panel|install|pair|devices|revoke|internet|hotspot|fonts|test|ingest|push|bench|translations|backup|reboot|shutdown]"; exit 2 ;;

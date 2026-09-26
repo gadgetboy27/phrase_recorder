@@ -98,6 +98,14 @@ after a deploy. llama-server (Qwen) stays installed but off — `tools/nano.sh
 start` for a session. The same install makes the wired power button on J14
 pins 11–12 a clean shutdown (logind, `multi-user.target`).
 
+**Which languages to trust:** `tools/calibrate.py --fetch` once, then
+`tools/calibrate.py` scores NLLB against professional human translations
+(FLORES-200, CC-BY-SA; TICO-19 medical, CC0) in chrF++ and prints a
+per-language table. It says which of the machine drafts a reviewer should read
+first — it never says a translation is safe to speak. `tools/test_calibrate.py`
+checks the scorer against sacreBLEU. Tongan is not in NLLB-200 at all, so it
+has no drafts by design and needs a human translator.
+
 **Scoring the models:** `tools/bench.py --lang mi` after any push or approval.
 Every recording is trimmed + resampled into `<batch>/derived/16k-trim/` on
 the Nano (roughly a quarter of the original size); that copy is what

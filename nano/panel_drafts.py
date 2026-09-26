@@ -33,10 +33,15 @@ DSN = "postgresql://interpreter_app@localhost:5432/interpreter_data"
 QWEN = "qwen2.5-3b-instruct"
 NLLB = "nllb-200-distilled-600M"
 NLLB_DIR = Path.home() / "models" / "nllb-600M-ct2-int8"
-# NLLB-200 language codes for ours (docs/data-contract.md). Every language in the list is covered.
+# NLLB-200 language codes for ours (docs/data-contract.md).
+# Tongan is deliberately absent: `ton_Latn` is NOT one of NLLB-200's languages (it is not among the 204
+# codes in FLORES-200, the set NLLB was built on), so asking for it fed the model a target token it has
+# never seen. Until 2026-09-27 we did ask, and relied on the ⁇/echo guard below to throw the answer away
+# — which is why Tongan "had no machine translation". Leaving it out makes that a rule, not a heuristic:
+# nllb_translate() returns None for `to` outright. Tongan needs a human translator (docs/project-brief.md).
 NLLB_CODES = {"en": "eng_Latn", "mi": "mri_Latn", "ar": "arb_Arab", "es": "spa_Latn", "fa": "pes_Arab", "prs": "prs_Arab",
               "hi": "hin_Deva", "vi": "vie_Latn", "zh": "zho_Hans", "yue": "yue_Hant", "ja": "jpn_Jpan", "ko": "kor_Hang",
-              "lo": "lao_Laoo", "pa": "pan_Guru", "sm": "smo_Latn", "tl": "tgl_Latn", "to": "ton_Latn"}
+              "lo": "lao_Laoo", "pa": "pan_Guru", "sm": "smo_Latn", "tl": "tgl_Latn"}
 _nllb = None
 _nllb_lock = threading.Lock()
 
