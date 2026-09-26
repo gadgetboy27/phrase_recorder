@@ -9,7 +9,12 @@ Postgres is the source of truth (docs/data-contract.md §2). After adding or
 editing rows in `phrases`, `phrase_categories`, or `languages` on the Nano,
 run this, then commit and push so the deployed recorder picks it up.
 Only `status = 'active'` phrases are exported, each with its approved
-translations per target language from golden_set. Stdlib only; needs psql.
+translations per target language from golden_set, plus `drafts`: unverified
+machine translations the recorder shows a volunteer only AFTER they have typed
+their own, so the machine cannot anchor them. Drafts come from the current
+translator (created_by 'nllb:%') and only where nothing is approved yet — the
+retired Qwen fallback's output is never published (it was degenerate repetition
+in Tongan; see nano/panel_drafts.py). Stdlib only; needs psql.
 """
 import argparse
 import json
@@ -34,7 +39,19 @@ SELECT json_build_object(
                     'translations', (SELECT coalesce(json_object_agg(split_part(g.language_pair, '-', 2), g.approved_translation), '{}')
                                      FROM golden_set g
                                      WHERE (g.phrase_key, g.phrase_version) = (p.phrase_key, p.version)
-                                       AND g.status = 'approved' AND g.language_pair LIKE 'en-%'))
+                                       AND g.status = 'approved' AND g.language_pair LIKE 'en-%'),
+                    -- Unverified machine drafts, for the recorder to show a volunteer AFTER they have
+                    -- typed their own (never before — it must not anchor them). Only the current
+                    -- translator's output: 'qwen:%' drafts are from the retired fallback and were
+                    -- degenerate repetition in Tongan, and only where no approved text exists.
+                    'drafts',       (SELECT coalesce(json_object_agg(split_part(g.language_pair, '-', 2), g.approved_translation), '{}')
+                                     FROM golden_set g
+                                     WHERE (g.phrase_key, g.phrase_version) = (p.phrase_key, p.version)
+                                       AND g.status = 'draft' AND g.created_by LIKE 'nllb:%'
+                                       AND g.language_pair LIKE 'en-%'
+                                       AND NOT EXISTS (SELECT 1 FROM golden_set a
+                                                       WHERE (a.phrase_key, a.phrase_version) = (g.phrase_key, g.phrase_version)
+                                                         AND a.language_pair = g.language_pair AND a.status = 'approved')))
                   ORDER BY p.phrase_key, p.version), '[]')
                  FROM phrases p WHERE p.status = 'active')
 )

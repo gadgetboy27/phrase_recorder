@@ -126,7 +126,24 @@
       "version": 1,
       "category": "obstetric_emergency",
       "text": "The umbilical cord is compressed. We must act immediately.",
-      "translations": {}
+      "translations": {},
+      "drafts": {
+        "ar": "الحبل السمكي مضغوط يجب أن نتحرك على الفور",
+        "es": "El cordón umbilical está comprimido.",
+        "fa": "نخ مفصل فشرده شده بايد فورا عمل کنيم",
+        "hi": "नेबिलिकल कॉर्ड संपीड़ित है. हमें तुरंत कार्रवाई करनी चाहिए.",
+        "ja": "ナビリカルコードが圧縮されているので すぐに行動しなければなりません",
+        "ko": "나비줄이 압축됐어 즉시 행동해야 합니다.",
+        "lo": "ສາຍແອວສາຍແອວຖືກກົດດັນ ພວກເຮົາຕ້ອງກະ ທໍາ ຢ່າງທັນທີ",
+        "mi": "Kua whakaitihia te taura pukupuku. Me mahi wawe tātou.",
+        "pa": "ਨਬਲੀਕਲ cord ਕੰਪਰੈੱਸ ਹੈ. ਸਾਨੂੰ ਤੁਰੰਤ ਕਾਰਵਾਈ ਕਰਨੀ ਚਾਹੀਦੀ ਹੈ.",
+        "prs": "نخ مفصل فشرده شده باید فوراً عمل کنیم",
+        "sm": "E tatau ona tatou gaoioi vave.",
+        "tl": "Ang umbilical cord ay na-compress.",
+        "vi": "Cordon ombilical bị nén, chúng ta phải hành động ngay lập tức.",
+        "yue": "脊髓被壓縮 我哋必須立即行動",
+        "zh": "我们必须立即采取行动."
+      }
     },
     {
       "key": "p003",
@@ -135,6 +152,22 @@
       "text": "Please stay as still as possible for me.",
       "translations": {
         "mi": "E noho puku mai, koa."
+      },
+      "drafts": {
+        "ar": "رجاءً إبق هادئاً قدر الإمكان بالنسبة لي.",
+        "es": "Por favor, quédate lo más quieto posible para mí.",
+        "fa": "لطفاً تا جایی که ممکنه برای من ثابت بمانید.",
+        "hi": "कृपया मेरे लिए जितना संभव हो उतना शांत रहें।",
+        "ja": "できるだけ静かにお願いします.",
+        "ko": "제발 가능한 한 가만히 있어",
+        "lo": "ກະລຸນາຍືນຢູ່ຢ່າງງຽບເທົ່າທີ່ເປັນໄປໄດ້ ສໍາ ລັບຂ້ອຍ.",
+        "pa": "ਕਿਰਪਾ ਕਰਕੇ ਮੇਰੇ ਲਈ ਜਿੰਨਾ ਸੰਭਵ ਹੋ ਸਕੇ ਸ਼ਾਂਤ ਰਹੋ.",
+        "prs": "خواهش میکنم تا جاییکه ممکنه برای من ثابت بمونید",
+        "sm": "Faamolemole ia tumau pea i le filemu e mafai ai mo aʻu.",
+        "tl": "Mangyaring manatili hangga't maaari para sa akin.",
+        "vi": "Làm ơn ở yên tĩnh nhất có thể cho tôi.",
+        "yue": "我請你盡可能保持靜止.",
+        "zh": "请尽可能静静地留下来."
       }
     },
     {
@@ -142,21 +175,72 @@
       "version": 1,
       "category": "obstetric_emergency",
       "text": "Your baby's heart rate has dropped. This is an emergency.",
-      "translations": {}
+      "translations": {},
+      "drafts": {
+        "ar": "ضربات قلب طفلك انخفضت هذه حالة طارئة",
+        "es": "El ritmo cardíaco de su bebé ha bajado.",
+        "fa": "ضربان قلب نوزادتون کم شده.",
+        "hi": "आपके बच्चे की दिल की धड़कन गिर गई है. यह एक आपात स्थिति है.",
+        "ja": "赤ちゃんの心拍数が下がった 緊急事態だ",
+        "ko": "아기의 심장 박동이 낮아졌어요",
+        "lo": "ອັດຕາສະຫມຸນໄພຂອງລູກຂອງທ່ານໄດ້ຫຼຸດລົງ. ນີ້ແມ່ນສຸກເສີນ.",
+        "mi": "Kua heke te pānga o te ngakau o tō tamaiti.",
+        "pa": "ਤੁਹਾਡੇ ਬੱਚੇ ਦੀ ਦਿਲ ਦੀ ਧੜਕਣ ਘਟ ਗਈ ਹੈ। ਇਹ ਐਮਰਜੈਂਸੀ ਹੈ।",
+        "prs": "ضربان قلب نوزادتون کم شده این یک اضطراریه",
+        "sm": "Ua pa'ū le fatu o lau pepe, o se faalavelave faafuaseʻi lenei.",
+        "tl": "Ang rate ng puso ng iyong sanggol ay bumaba.",
+        "vi": "Nhịp tim của em bé đã giảm, đây là trường hợp khẩn cấp.",
+        "yue": "你個細路嘅心率下降咗,呢個係緊急狀態.",
+        "zh": "你宝宝的心率下降了,这是紧急情况."
+      }
     },
     {
       "key": "p005",
       "version": 1,
       "category": "obstetric_emergency",
       "text": "We need to perform an emergency caesarean section right now to protect your baby.",
-      "translations": {}
+      "translations": {},
+      "drafts": {
+        "ar": "نحتاج لإجراء عملية قيصرية طارئة الآن لحماية طفلك",
+        "es": "Necesitamos realizar una cesárea de emergencia ahora mismo para proteger a tu bebé.",
+        "fa": "ما بايد الان يه قطع قيصري اضطراري انجام بديم تا از نوزادتون محافظت کنيم",
+        "hi": "हमें आपके बच्चे की रक्षा के लिए तुरंत आपातकालीन सीजेरियन सेक्शन करने की आवश्यकता है।",
+        "ja": "赤ちゃんを守るために 今すぐ緊急シーザリー手術が必要です",
+        "ko": "지금 당장 응급剖腹產 수술을 해야 돼 네 아기를 보호해",
+        "lo": "ພວກເຮົາຍັງຕ້ອງໄດ້ປະຕິບັດການຕັດເຊຊາເຣຍສຸກເສີນທັນທີ ເພື່ອປົກປ້ອງລູກຂອງທ່ານ.",
+        "mi": "E hiahia ana mātou ki te mahi i tētahi taahiraa o te taahiraa i tēnei wā hei tiaki i tō tamaiti.",
+        "pa": "ਸਾਨੂੰ ਤੁਹਾਡੇ ਬੱਚੇ ਦੀ ਰੱਖਿਆ ਕਰਨ ਲਈ ਐਮਰਜੈਂਸੀ ਸੀਜ਼ਰਨ ਸੈਕਸ਼ਨ ਕਰਵਾਉਣ ਦੀ ਲੋੜ ਹੈ।",
+        "prs": "برای محافظت از نوزاد شما باید فوراً یک سزارین اضطراری انجام بدیم",
+        "sm": "E tatau ona tatou faia se taotoga faafuaseʻi o le Kaisareia e puipuia ai lau pepe.",
+        "tl": "Kailangan naming gumawa ng emergency caesarean section ngayon upang maprotektahan ang iyong sanggol.",
+        "vi": "Chúng ta cần phải tiến hành phẫu thuật ca-se-ra khẩn cấp ngay bây giờ để bảo vệ em bé của bạn.",
+        "yue": "我哋需要立刻做緊急剖腹產 嚟保護你嘅寶貝",
+        "zh": "我们需要立即进行紧急剖腹产,以保护你的宝宝."
+      }
     },
     {
       "key": "p006",
       "version": 1,
       "category": "obstetric_emergency",
       "text": "We are going to give you an injection to help you and your baby.",
-      "translations": {}
+      "translations": {},
+      "drafts": {
+        "ar": "سنعطيك حقنة لمساعدتك وطفلك",
+        "es": "Le daremos una inyección para ayudarle a usted y a su bebé.",
+        "fa": "برای کمک به تو و نوزادت یه تزریق میکنیم.",
+        "hi": "हम आपको और आपके बच्चे की मदद के लिए एक इंजेक्शन देने जा रहे हैं।",
+        "ja": "あなたと赤ちゃんを助けるために 注射をします",
+        "ko": "우리는 당신과 당신의 아기를 돕기 위해 주사를 주게 될 것입니다.",
+        "lo": "ພວກເຮົາຈະສັກຢາໃຫ້ເຈົ້າ ແລະລູກເຈົ້າ.",
+        "mi": "Ka hoatu e mātou he werohanga hei āwhina i a koe me tō tamaiti.",
+        "pa": "ਅਸੀਂ ਤੁਹਾਨੂੰ ਅਤੇ ਤੁਹਾਡੇ ਬੱਚੇ ਦੀ ਮਦਦ ਲਈ ਇੱਕ ਟੀਕਾ ਦੇਣ ਜਾ ਰਹੇ ਹਾਂ।",
+        "prs": "ما به شما یک تزریق می دهیم تا به شما و نوزاد شما کمک کند.",
+        "sm": "O le a matou avatu iā te oe se tui e fesoasoani iā te oe ma lau pepe.",
+        "tl": "Magbibigay kami ng isang iniksyon upang makatulong sa iyo at sa iyong sanggol.",
+        "vi": "Chúng tôi sẽ tiêm cho bạn để giúp bạn và em bé của bạn.",
+        "yue": "我哋會畀你一個注射 去幫助你同你嘅寶貝",
+        "zh": "我们要给你一个注射来帮助你和你的宝宝."
+      }
     },
     {
       "key": "p007",
@@ -165,6 +249,22 @@
       "text": "Try to breathe slowly and deeply.",
       "translations": {
         "mi": "Whakamātauhia ki te whakahā āta ki te whakahā hōhonu hoki."
+      },
+      "drafts": {
+        "ar": "حاول أن تتنفس ببطء و بعمق",
+        "es": "Trate de respirar lentamente y profundamente.",
+        "fa": "سعی کن آروم و عمیق نفس بکشی.",
+        "hi": "धीमी और गहरी सांस लेने की कोशिश करें।",
+        "ja": "ゆっくりと深く呼吸してみてください.",
+        "ko": "천천히 깊이 숨을 쉬도록 노력하세요.",
+        "lo": "ພະຍາຍາມຫາຍໃຈຊ້າ ແລະ ເລິກເຊິ່ງ.",
+        "pa": "ਹੌਲੀ ਅਤੇ ਡੂੰਘੀ ਸਾਹ ਲੈਣ ਦੀ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+        "prs": "سعی کنید آهسته و عمیق نفس بکشید.",
+        "sm": "Taumafai e mānava lemu ma le loloto.",
+        "tl": "Subukang huminga nang mabagal at malalim.",
+        "vi": "Cố gắng thở chậm và sâu.",
+        "yue": "嘗試慢慢深呼吸",
+        "zh": "试着慢慢地深呼吸."
       }
     },
     {
@@ -172,490 +272,1677 @@
       "version": 1,
       "category": "obstetric_emergency",
       "text": "The baby is coming now, you need to push.",
-      "translations": {}
+      "translations": {},
+      "drafts": {
+        "ar": "الطفل قادم الآن، عليك أن تدفع",
+        "es": "El bebé viene ahora, tienes que empujar.",
+        "fa": "بچه داره مياد، بايد فشار بدي.",
+        "hi": "बच्चा अब आ रहा है, आपको धक्का देना होगा।",
+        "ja": "赤ちゃんが来るぞ 押さえてくれ",
+        "ko": "아기가 오고 있어, 밀어내야 돼",
+        "lo": "ເດັກນ້ອຍ ກໍາ ລັງຈະມາຮອດແລ້ວ, ທ່ານຕ້ອງກົດດັນ.",
+        "mi": "Kei te haere mai te tamaiti, me akiaki koe.",
+        "pa": "ਬੱਚਾ ਹੁਣ ਆ ਰਿਹਾ ਹੈ, ਤੁਹਾਨੂੰ ਧੱਕਣ ਦੀ ਲੋੜ ਹੈ.",
+        "prs": "بچه داره میاد حالا باید فشار بدی",
+        "sm": "Ua oo mai le pepe, e tatau ona e tuleia.",
+        "tl": "Ang sanggol ay darating ngayon, kailangan mong i-push.",
+        "vi": "Con sắp ra đời, anh phải đẩy.",
+        "yue": "寶寶即將出世 你需要推",
+        "zh": "宝宝即将到来,你必须推动."
+      }
     },
     {
       "key": "p010",
       "version": 1,
       "category": "obstetric_emergency",
       "text": "Is there anyone you would like us to call?",
-      "translations": {}
+      "translations": {},
+      "drafts": {
+        "ar": "هل هناك أي شخص تريدنا أن نتصل به؟",
+        "es": "¿Hay alguien a quien quieras que llamemos?",
+        "fa": "کسي هست که ميخواي که بهش زنگ بزنیم؟",
+        "hi": "क्या आप चाहते हैं कि हम किसी को फोन करें?",
+        "ja": "誰かに電話してほしいの?",
+        "ko": "우리가 전화하기를 원하는 사람이 있나요?",
+        "lo": "ທ່ານຢາກໃຫ້ພວກເຮົາໂທຫາໃຜແດ່?",
+        "mi": "Kei reira tetahi e hiahia ana koe kia karanga tatou?",
+        "pa": "ਕੀ ਕੋਈ ਹੈ ਜਿਸਨੂੰ ਤੁਸੀਂ ਬੁਲਾਉਣਾ ਚਾਹੁੰਦੇ ਹੋ?",
+        "prs": "کسی هست که میخوای بهش زنگ بزنیم؟",
+        "sm": "Pe e iai se tasi e te manaʻo e valaau i ai?",
+        "tl": "May nais mong tawagin ba tayo?",
+        "vi": "Có ai mà cô muốn chúng tôi gọi không?",
+        "yue": "你想我哋打電話俾人?",
+        "zh": "你希望我们打电话给别人吗?"
+      }
     },
     {
       "key": "p011",
       "version": 2,
       "category": "welcome",
       "text": "My name is",
-      "translations": {}
+      "translations": {},
+      "drafts": {
+        "ar": "اسمي هو",
+        "fa": "اسم من اينه",
+        "ko": "내 이름은",
+        "lo": "ຊື່ຂ້ອຍແມ່ນ",
+        "mi": "Ko taku ingoa ko",
+        "pa": "ਮੇਰਾ ਨਾਮ ਹੈ",
+        "prs": "اسم من اینه",
+        "sm": "O loʻu igoa o",
+        "tl": "Ang pangalan ko ay",
+        "vi": "Tên tôi là",
+        "yue": "我叫",
+        "zh": "我的名字是"
+      }
     },
     {
       "key": "p012",
       "version": 1,
       "category": "welcome",
       "text": "What is your name?",
-      "translations": {}
+      "translations": {},
+      "drafts": {
+        "ar": "ما اسمك ؟",
+        "es": "¿Cuál es tu nombre?",
+        "fa": "اسم تو چيه؟",
+        "fr": "- Quel est votre nom ?",
+        "hi": "तुम्हारा नाम क्या है?",
+        "ja": "お前の名前は?",
+        "ko": "네 이름이 뭐야?",
+        "lo": "ຊື່ເຈົ້າແມ່ນຫຍັງ?",
+        "mi": "He aha to ingoa?",
+        "pa": "ਤੁਹਾਡਾ ਨਾਮ ਕੀ ਹੈ?",
+        "prs": "اسم شما چیه؟",
+        "sm": "O ai lou igoa?",
+        "tl": "Ano ang iyong pangalan?",
+        "vi": "Tên anh là gì?",
+        "yue": "你的名字係咩?",
+        "zh": "你的名字是什么?"
+      }
     },
     {
       "key": "p013",
       "version": 1,
       "category": "patient_replies",
       "text": "Yes",
-      "translations": {}
+      "translations": {},
+      "drafts": {
+        "ar": "نعم",
+        "es": "Sí , es cierto .",
+        "fa": "آره",
+        "fr": "Oui, c'est vrai.",
+        "ja": "ええ",
+        "ko": "그래요",
+        "lo": "ແມ່ນແລ້ວ",
+        "mi": "Ae ra",
+        "pa": "ਹਾਂ",
+        "prs": "درسته",
+        "sm": "Ioe",
+        "tl": "Oo",
+        "vi": "Vâng.",
+        "yue": "係嘅",
+        "zh": "是的."
+      }
     },
     {
       "key": "p014",
       "version": 1,
       "category": "patient_replies",
       "text": "No",
-      "translations": {}
+      "translations": {},
+      "drafts": {
+        "ar": "لا , لا",
+        "es": "No es así.",
+        "fa": "نه نه",
+        "fr": "Je ne veux pas.",
+        "ja": "いいえ",
+        "ko": "아니",
+        "lo": "ບໍ່",
+        "mi": "E kore",
+        "pa": "ਨਹੀਂ",
+        "prs": "نه ، نه",
+        "sm": "Leai",
+        "tl": "Hindi",
+        "vi": "Không.",
+        "yue": "唔係",
+        "zh": "没有."
+      }
     },
     {
       "key": "p015",
       "version": 1,
       "category": "patient_replies",
       "text": "I don't understand",
-      "translations": {}
+      "translations": {},
+      "drafts": {
+        "ar": "أنا لا أفهم",
+        "es": "No lo entiendo.",
+        "fa": "من نمي فهمم",
+        "fr": "Je ne comprends pas.",
+        "hi": "मैं समझ में नहीं आता",
+        "ja": "分からない",
+        "ko": "이해가 안 돼",
+        "lo": "ຂ້ອຍບໍ່ເຂົ້າໃຈ",
+        "mi": "E kore ahau e matau",
+        "pa": "ਮੈਂ ਸਮਝ ਨਹੀਂ ਪਾ ਰਿਹਾ",
+        "prs": "من نمی فهمم",
+        "sm": "Ou te lē malamalama",
+        "tl": "Hindi ko maintindihan",
+        "vi": "Tôi không hiểu.",
+        "yue": "我唔明白",
+        "zh": "我不明白."
+      }
     },
     {
       "key": "p016",
       "version": 1,
       "category": "patient_replies",
       "text": "Please say it again",
-      "translations": {}
+      "translations": {},
+      "drafts": {
+        "ar": "من فضلك قل ذلك مرة أخرى",
+        "es": "Por favor, vuelve a decirlo.",
+        "fa": "خواهش ميکنم دوباره بگو",
+        "fr": "Je vous en prie, dites-le encore.",
+        "hi": "कृपया इसे फिर से कहें",
+        "ja": "もう一度言ってくれ",
+        "ko": "다시 말해주세요",
+        "lo": "ກະລຸນາເວົ້າອີກເທື່ອ ຫນຶ່ງ",
+        "mi": "Tena koa ki te korero ano",
+        "pa": "ਕਿਰਪਾ ਕਰਕੇ ਦੁਬਾਰਾ ਕਹੋ",
+        "prs": "خواهش می کنم دوباره بگو",
+        "sm": "Faamolemole toe fai mai",
+        "tl": "Mangyaring sabihin ito muli",
+        "vi": "Vui lòng nói lại.",
+        "yue": "請再講一次",
+        "zh": "请再说一次"
+      }
     },
     {
       "key": "p017",
       "version": 1,
       "category": "patient_replies",
       "text": "I have pain",
-      "translations": {}
+      "translations": {},
+      "drafts": {
+        "ar": "لدي ألم",
+        "es": "Tengo dolor.",
+        "fa": "من درد دارم",
+        "fr": "Je souffre.",
+        "hi": "मुझे दर्द है",
+        "ja": "痛みがある",
+        "ko": "난 고통이 있어요",
+        "lo": "ຂ້ອຍເຈັບປວດ",
+        "mi": "Kei te mamae ahau",
+        "pa": "ਮੈਨੂੰ ਦਰਦ ਹੈ",
+        "prs": "من درد دارم",
+        "sm": "Ou te mafatia",
+        "tl": "Ako ay nasasaktan",
+        "vi": "Tôi bị đau.",
+        "zh": "我有痛苦."
+      }
     },
     {
       "key": "p018",
       "version": 1,
       "category": "patient_replies",
       "text": "I need the toilet",
-      "translations": {}
+      "translations": {},
+      "drafts": {
+        "ar": "أحتاج إلى المرحاض",
+        "es": "Necesito el baño.",
+        "fa": "من به توالت نياز دارم",
+        "fr": "J' ai besoin des toilettes.",
+        "hi": "मुझे शौचालय की जरूरत है",
+        "ja": "トイレが必要だ",
+        "ko": "화장실이 필요해",
+        "lo": "ຂ້ອຍຕ້ອງການຫ້ອງນ້ ໍາ",
+        "mi": "E hiahia ana ahau ki te wharepaku",
+        "pa": "ਮੈਨੂੰ ਟਾਇਲਟ ਦੀ ਲੋੜ ਹੈ",
+        "prs": "من به توالت نیاز دارم",
+        "sm": "Ou te manaʻomia le faletaele",
+        "tl": "Kailangan ko ng banyo",
+        "vi": "Tôi cần đi vệ sinh."
+      }
     },
     {
       "key": "p019",
       "version": 1,
       "category": "patient_replies",
       "text": "Please call my family",
-      "translations": {}
+      "translations": {},
+      "drafts": {
+        "ar": "من فضلك اتصل بعائلتي",
+        "es": "Por favor llame a mi familia",
+        "fa": "لطفاً به خانواده ام زنگ بزن",
+        "fr": "S' il vous plaît appelez ma famille",
+        "hi": "कृपया मेरे परिवार को फोन करें",
+        "ja": "私の家族に電話してください",
+        "ko": "제 가족을 전화해 주세요",
+        "lo": "ກະລຸນາໂທຫາຄອບຄົວຂອງຂ້ອຍ",
+        "mi": "Tena koa waea atu ki taku whanau",
+        "pa": "ਕਿਰਪਾ ਕਰਕੇ ਮੇਰੇ ਪਰਿਵਾਰ ਨੂੰ ਫੋਨ ਕਰੋ",
+        "prs": "لطفاً به خانواده من زنگ بزنید",
+        "sm": "Faamolemole valaau i loʻu aiga",
+        "tl": "Mangyaring tawagan ang aking pamilya",
+        "vi": "Xin hãy gọi cho gia đình tôi.",
+        "yue": "請打電話俾我嘅家人",
+        "zh": "请打电话给我的家人"
+      }
     },
     {
       "key": "p020",
       "version": 1,
       "category": "panel_ui",
       "text": "Tap to reply",
-      "translations": {}
+      "translations": {},
+      "drafts": {
+        "ar": "اضغط على الإجابة",
+        "es": "Toque para responder",
+        "fa": "برای پاسخ دادن ضربه بزنید",
+        "fr": "Tapez pour répondre",
+        "hi": "उत्तर देने के लिए टैप करें",
+        "ja": "答えにタップする",
+        "ko": "응답하기 위해 탭",
+        "lo": "ແຕະເພື່ອຕອບ",
+        "mi": "Pāwhiri ki te whakautu",
+        "pa": "ਜਵਾਬ ਦੇਣ ਲਈ ਟੈਪ ਕਰੋ",
+        "prs": "برای پاسخ دادن ضربه بزنید",
+        "sm": "Kiliki e tali",
+        "tl": "I-tap upang tumugon",
+        "vi": "Nhấn để trả lời",
+        "yue": "點擊返答",
+        "zh": "打点来回复"
+      }
     },
     {
       "key": "p021",
       "version": 1,
       "category": "panel_ui",
       "text": "Stop",
-      "translations": {}
+      "translations": {},
+      "drafts": {
+        "ar": "توقف",
+        "es": "Deje de hacerlo.",
+        "fa": "توقف کن",
+        "fr": "Arrêtez !",
+        "hi": "रुक जाओ",
+        "ja": "止めて",
+        "ko": "멈춰",
+        "lo": "ຢຸດລົງ",
+        "mi": "Whakamutua",
+        "pa": "ਰੁਕੋ",
+        "prs": "توقف کنید",
+        "sm": "Taofi",
+        "tl": "Huminto ka.",
+        "vi": "Ngừng đi.",
+        "yue": "停下嚟",
+        "zh": "停下来"
+      }
     },
     {
       "key": "p022",
       "version": 1,
       "category": "panel_ui",
       "text": "Reply again",
-      "translations": {}
+      "translations": {},
+      "drafts": {
+        "ar": "أجيب مرة أخرى",
+        "es": "Responda otra vez",
+        "fa": "دوباره جواب بده",
+        "fr": "Répondre à nouveau",
+        "hi": "पुनः उत्तर दें",
+        "ja": "返信する",
+        "ko": "다시 대답하세요",
+        "lo": "ຕອບອີກເທື່ອຫນຶ່ງ",
+        "mi": "Whakautu anō",
+        "pa": "ਦੁਬਾਰਾ ਜਵਾਬ ਦਿਓ",
+        "prs": "دوباره پاسخ دادن",
+        "sm": "Toe tali mai",
+        "tl": "Sagutin muli",
+        "vi": "Trả lời một lần nữa",
+        "yue": "再回覆",
+        "zh": "再回复"
+      }
     },
     {
       "key": "p023",
       "version": 1,
       "category": "panel_ui",
       "text": "Hear it again",
-      "translations": {}
+      "translations": {},
+      "drafts": {
+        "ar": "إسمعها مرة أخرى",
+        "es": "Escucha otra vez.",
+        "fa": "دوباره گوش کن",
+        "fr": "Écoutez-le encore une fois",
+        "hi": "इसे फिर से सुनें",
+        "ja": "もう一度聞け",
+        "ko": "다시 들어봐",
+        "lo": "ຟັງມັນອີກເທື່ອຫນຶ່ງ",
+        "mi": "Whakarongo anō",
+        "pa": "ਇਸ ਨੂੰ ਦੁਬਾਰਾ ਸੁਣੋ",
+        "prs": "دوباره بشنویش",
+        "sm": "Toe faalogo i ai.",
+        "tl": "Pakinggan mo ulit ito.",
+        "vi": "Nghe nó một lần nữa",
+        "yue": "再聽一次",
+        "zh": "再听一次."
+      }
     },
     {
       "key": "p024",
       "version": 1,
       "category": "intake",
       "text": "What is your date of birth?",
-      "translations": {}
+      "translations": {},
+      "drafts": {
+        "ar": "ما هو تاريخ ميلادك؟",
+        "es": "¿Cuál es tu fecha de nacimiento?",
+        "fa": "تاریخ تولدت چیه؟",
+        "ja": "あなたの誕生日は?",
+        "ko": "네 생일이 뭐죠?",
+        "lo": "ວັນເດືອນປີເກີດຂອງທ່ານແມ່ນຫຍັງ?",
+        "mi": "He aha tō rā whānau?",
+        "pa": "ਤੁਹਾਡੀ ਜਨਮ ਤਾਰੀਖ ਕੀ ਹੈ?",
+        "prs": "تاریخ تولد شما چیه؟",
+        "sm": "O le ā lou aso fanau?",
+        "tl": "Ano ang iyong petsa ng kapanganakan?",
+        "vi": "Ngày sinh của anh là gì?",
+        "yue": "你出生的日期係咩?",
+        "zh": "你的出生日期是什么?"
+      }
     },
     {
       "key": "p025",
       "version": 1,
       "category": "intake",
       "text": "Are you pregnant?",
-      "translations": {}
+      "translations": {},
+      "drafts": {
+        "ar": "هل أنتِ حامل؟",
+        "es": "¿Estás embarazada?",
+        "fa": "حامله هستي؟",
+        "hi": "क्या आप गर्भवती हैं?",
+        "ja": "妊娠してるの?",
+        "ko": "임신 중이야?",
+        "lo": "ເຈົ້າຖືພາບໍ?",
+        "mi": "Kei te hapu koe?",
+        "pa": "ਕੀ ਤੁਸੀਂ ਗਰਭਵਤੀ ਹੋ?",
+        "prs": "مگر حامله ای؟",
+        "sm": "Po o e maʻitaga?",
+        "tl": "Nagdadalang ka ba?",
+        "vi": "Cô có mang thai không?",
+        "yue": "你有冇懷孕?",
+        "zh": "你怀孕了吗?"
+      }
     },
     {
       "key": "p026",
       "version": 1,
       "category": "intake",
       "text": "How many weeks pregnant are you?",
-      "translations": {}
+      "translations": {},
+      "drafts": {
+        "ar": "كم أسبوع من الحمل لديك؟",
+        "es": "¿Cuántas semanas de embarazo tienes?",
+        "fa": "چند هفته باردار هستي؟",
+        "hi": "आप कितने सप्ताह की गर्भवती हैं?",
+        "ja": "何週間妊娠してるの?",
+        "ko": "임신 몇 주입니까?",
+        "lo": "ເຈົ້າຖືພາຫຼາຍປານໃດ?",
+        "mi": "E hia nga wiki e hapu ana koe?",
+        "pa": "ਤੁਸੀਂ ਕਿੰਨੇ ਹਫ਼ਤਿਆਂ ਦੀ ਗਰਭਵਤੀ ਹੋ?",
+        "prs": "شما چند هفته باردار هستید؟",
+        "sm": "E fia vaiaso o lou maʻitaga?",
+        "tl": "Ilang linggo ka nang buntis?",
+        "vi": "Cô đang mang thai bao nhiêu tuần?",
+        "yue": "你懷孕幾週?",
+        "zh": "你怀孕了多少周?"
+      }
     },
     {
       "key": "p027",
       "version": 1,
       "category": "intake",
       "text": "Do you have any medical conditions?",
-      "translations": {}
+      "translations": {},
+      "drafts": {
+        "ar": "هل لديك أي ظروف طبية؟",
+        "es": "¿Tiene alguna condición médica?",
+        "fa": "تو یه شرایط پزشکی داری؟",
+        "hi": "क्या आपके पास कोई चिकित्सा स्थिति है?",
+        "ja": "病気はありますか?",
+        "ko": "건강상태가 있나요?",
+        "lo": "ທ່ານມີອາການໃດໆບໍ?",
+        "mi": "Kei a koe ētahi āhuatanga hauora?",
+        "pa": "ਕੀ ਤੁਹਾਡੇ ਕੋਈ ਡਾਕਟਰੀ ਹਾਲਾਤ ਹਨ?",
+        "prs": "آیا شما شرایط پزشکی دارید؟",
+        "sm": "Pe e iai ni ou faalogona?",
+        "tl": "Mayroon ka bang anumang medikal na kondisyon?",
+        "vi": "Anh có bất kỳ tình trạng y tế nào không?",
+        "yue": "你有冇醫療病情?",
+        "zh": "你有没有任何疾病?"
+      }
     },
     {
       "key": "p028",
       "version": 1,
       "category": "intake",
       "text": "Are you taking any medicines?",
-      "translations": {}
+      "translations": {},
+      "drafts": {
+        "ar": "هل تتناول أي أدوية؟",
+        "es": "¿Está tomando algún medicamento?",
+        "fa": "دارويي مصرف ميکني؟",
+        "hi": "क्या आप कोई दवा ले रहे हैं?",
+        "ja": "何か薬を飲んでいるか?",
+        "ko": "약물을 복용하시나요?",
+        "lo": "ທ່ານກິນຢາໃດໆບໍ?",
+        "mi": "Kei te tango koe i ētahi rongoā?",
+        "pa": "ਕੀ ਤੁਸੀਂ ਕੋਈ ਦਵਾਈ ਲੈ ਰਹੇ ਹੋ?",
+        "prs": "آیا داروها مصرف می کنید؟",
+        "sm": "Po o e tagofia ni fualaau?",
+        "tl": "Kumukuha ka ba ng anumang gamot?",
+        "vi": "Anh có dùng thuốc không?",
+        "yue": "你有冇服用藥物?",
+        "zh": "你正在服用任何药物吗?"
+      }
     },
     {
       "key": "p029",
       "version": 1,
       "category": "intake",
       "text": "Have you had surgery before?",
-      "translations": {}
+      "translations": {},
+      "drafts": {
+        "ar": "هل جرى جراحة من قبل؟",
+        "es": "¿Has tenido alguna cirugía antes?",
+        "fa": "قبلاً جراحي کردي؟",
+        "hi": "क्या आपको पहले भी सर्जरी हुई है?",
+        "ja": "手術を受けたことはありますか?",
+        "ko": "수술을 해본 적 있나요?",
+        "lo": "ທ່ານ ເຄີຍ ໄດ້ ຮັບ ການ ຜ່າຕັດ ກ່ອນຫນ້ານີ້ ບໍ?",
+        "mi": "Kua oti i a koe te ahupūngao i mua?",
+        "pa": "ਕੀ ਤੁਹਾਨੂੰ ਪਹਿਲਾਂ ਵੀ ਸਰਜਰੀ ਹੋਈ ਹੈ?",
+        "prs": "قبلاً جراحي کرده بودي؟",
+        "sm": "Pe na e faia se taotoga muamua?",
+        "tl": "Nakapagopera ka na ba?",
+        "vi": "Anh đã từng phẫu thuật chưa?",
+        "yue": "你有冇做過手術?",
+        "zh": "你以前曾经接受过手术吗?"
+      }
     },
     {
       "key": "p030",
       "version": 1,
       "category": "intake",
       "text": "Who is your next of kin?",
-      "translations": {}
+      "translations": {},
+      "drafts": {
+        "ar": "من قريبك القريب؟",
+        "es": "¿Quién es tu pariente más cercano?",
+        "fa": "نزدیک ترین خویشاوندت کیه؟",
+        "hi": "आपके निकटतम रिश्तेदार कौन हैं?",
+        "ja": "あなたの近親は誰?",
+        "ko": "가장 가까운 친척은 누구죠?",
+        "lo": "ຄົນໃກ້ຊິດຂອງທ່ານແມ່ນໃຜ?",
+        "mi": "Ko wai tō whanaunga tata?",
+        "pa": "ਤੁਹਾਡਾ ਨਜ਼ਦੀਕੀ ਰਿਸ਼ਤੇਦਾਰ ਕੌਣ ਹੈ?",
+        "prs": "نزدیک ترین خویشاوند تو کیه؟",
+        "sm": "O ai lou aiga e sili ona vavalalata?",
+        "tl": "Sino ang iyong pinakamalapit na kamag-anak?",
+        "vi": "Gia đình gần gũi của anh là ai?",
+        "yue": "你最親戚係邊個?",
+        "zh": "你最亲密的亲戚是谁?"
+      }
     },
     {
       "key": "p031",
       "version": 1,
       "category": "allergy",
       "text": "Are you allergic to any medicines?",
-      "translations": {}
+      "translations": {},
+      "drafts": {
+        "ar": "هل أنت حساسة من أي أدوية؟",
+        "es": "¿Es usted alérgico a algún medicamento?",
+        "fa": "شما نسبت به هر دارویی آلرژی دارید؟",
+        "hi": "क्या आप किसी भी दवा के प्रति एलर्जी से ग्रस्त हैं?",
+        "ja": "あなたはどんな薬にもアレルギーがありますか?",
+        "ko": "어떤 약물에 알레르기가 있습니까?",
+        "lo": "ທ່ານມີອາການແພດຕໍ່ຢາໃດໆບໍ?",
+        "mi": "He ārai koe ki tētahi rongoā?",
+        "pa": "ਕੀ ਤੁਸੀਂ ਕਿਸੇ ਦਵਾਈ ਪ੍ਰਤੀ ਐਲਰਜੀ ਮਹਿਸੂਸ ਕਰਦੇ ਹੋ?",
+        "prs": "آیا به هیچ دارو ها حساسیت دارید؟",
+        "sm": "Pe e te allergic i so o se vailaau?",
+        "tl": "May allergy ka ba sa anumang gamot?",
+        "vi": "Bạn có dị ứng với bất kỳ loại thuốc nào không?",
+        "yue": "你對任何藥物有過敏嗎?",
+        "zh": "你对任何药物过敏吗?"
+      }
     },
     {
       "key": "p032",
       "version": 1,
       "category": "allergy",
       "text": "Are you allergic to latex?",
-      "translations": {}
+      "translations": {},
+      "drafts": {
+        "ar": "هل أنت حساسة من اللاتكس؟",
+        "es": "¿Es usted alérgico al látex?",
+        "fa": "آلرژی به لاتکس داری؟",
+        "hi": "क्या आपको लेटेक्स से एलर्जी है?",
+        "ja": "ラテックスにアレルギーがあるの?",
+        "ko": "라텍스에 알레르기가 있나요?",
+        "lo": "ທ່ານມີອາການອະລົກຕໍ່ latex ບໍ?",
+        "mi": "Kei te ārai koe ki te rākau?",
+        "pa": "ਕੀ ਤੁਹਾਨੂੰ ਲੈਟੇਕਸ ਪ੍ਰਤੀ ਐਲਰਜੀ ਹੈ?",
+        "prs": "به لاتکس آلرژی دارید؟",
+        "sm": "Pe e te aafia i le latex?",
+        "tl": "May allergy ka ba sa latex?",
+        "vi": "Bạn có dị ứng với latex không?",
+        "yue": "你對乳膠有過敏嗎?"
+      }
     },
     {
       "key": "p033",
       "version": 1,
       "category": "allergy",
       "text": "Are you allergic to any foods?",
-      "translations": {}
+      "translations": {},
+      "drafts": {
+        "ar": "هل أنت حساسة من أي طعام؟",
+        "es": "¿Es usted alérgico a algún alimento?",
+        "fa": "به غذاها حساسيت داري؟",
+        "hi": "क्या आप किसी भी खाद्य पदार्थों के प्रति एलर्जी से ग्रस्त हैं?",
+        "ja": "あなたはどんな食物にもアレルギーがありますか?",
+        "ko": "어떤 음식에 알레르기가 있습니까?",
+        "lo": "ທ່ານມີອາການອະລົກຕໍ່ອາຫານໃດໆບໍ?",
+        "mi": "He ārai koe ki tētahi kai?",
+        "pa": "ਕੀ ਤੁਹਾਨੂੰ ਕਿਸੇ ਵੀ ਭੋਜਨ ਪ੍ਰਤੀ ਐਲਰਜੀ ਹੈ?",
+        "prs": "به هر غذايي حساسيت داري؟",
+        "sm": "Pe e iai ni ou allergies i ni meaʻai?",
+        "tl": "May allergy ka ba sa anumang pagkain?",
+        "vi": "Bạn có dị ứng với bất kỳ thực phẩm nào không?",
+        "yue": "你對任何食物有過敏嗎?",
+        "zh": "你对任何食物有过敏吗?"
+      }
     },
     {
       "key": "p034",
       "version": 1,
       "category": "allergy",
       "text": "Have you had a bad reaction to anaesthetic before?",
-      "translations": {}
+      "translations": {},
+      "drafts": {
+        "ar": "هل كان لديك رد فعل سيء على المخدرات من قبل؟",
+        "es": "¿Ha tenido alguna mala reacción ante los anestésicos antes?",
+        "fa": "تا حالا به داروهای بیهوشی واکنش بدی داشته ای؟",
+        "hi": "क्या आपको पहले भी एनेस्थेटिक से बुरी प्रतिक्रिया आई है?",
+        "ja": "麻酔薬に対して 悪い反応をしたことはありますか?",
+        "ko": "마취에 대한 나쁜 반응이 있었나요?",
+        "lo": "ທ່ານເຄີຍມີປະຕິກິລິຍາທີ່ບໍ່ດີຕໍ່ຢາເສບຕິດກ່ອນບໍ?",
+        "mi": "Kua pā mai rānei koe ki te whakamate i mua?",
+        "pa": "ਕੀ ਤੁਹਾਨੂੰ ਪਹਿਲਾਂ ਵੀ ਅਨੱਸਥੀਸੀਆ ਪ੍ਰਤੀ ਬੁਰੀ ਪ੍ਰਤੀਕ੍ਰਿਆ ਆਈ ਹੈ?",
+        "prs": "تا حالا به داروهای بیهوشی واکنش بدی داشته ای؟",
+        "sm": "Pe na iai ni ou faalogona lē lelei i fualaau faasaina?",
+        "tl": "Mayroon ka bang masamang reaksyon sa anesthesia bago pa?",
+        "vi": "Bạn đã có phản ứng xấu trước khi sử dụng thuốc gây tê chưa?",
+        "yue": "你有冇試過對麻醉藥產生壞反應?",
+        "zh": "你有没有以前对麻醉药反应不好?"
+      }
     },
     {
       "key": "p035",
       "version": 1,
       "category": "allergy",
       "text": "Tell me if you feel itchy or your lips swell.",
-      "translations": {}
+      "translations": {},
+      "drafts": {
+        "ar": "أخبرني إذا كنت تشعر بالحكة أو شفاهك تتورم",
+        "es": "Dime si tienes picazón o si tus labios se hinchan.",
+        "fa": "بهم بگو اگه احساس خارش ميکني يا لب هايت ورم ميکنه",
+        "hi": "मुझे बताओ अगर आपको खुजली हो रही है या आपके होंठ सूज रहे हैं।",
+        "ja": "ほら ほら ほら ほら ほら ほら",
+        "ko": "가려움증이나 입술이 붓는 경우 말해줘.",
+        "lo": "ບອກຂ້ອຍຖ້າເຈົ້າມີອາການຮອຍຮອຍຮອຍຮອຍ ຫຼື ປາກຂອງເຈົ້າລໍາບາກ.",
+        "mi": "Korero mai ki ahau mēnā kei te ngenge koe, kei te pakaru rānei ō ngutu.",
+        "pa": "ਮੈਨੂੰ ਦੱਸੋ ਕਿ ਕੀ ਤੁਹਾਨੂੰ ਘਬਰਾਹਟ ਮਹਿਸੂਸ ਹੁੰਦੀ ਹੈ ਜਾਂ ਤੁਹਾਡੇ ਬੁੱਲ੍ਹਾਂ ਉਬਲਦੀਆਂ ਹਨ।",
+        "prs": "به من بگو اگر احساس خارش می کنی یا لب هایت پُر میشن",
+        "sm": "Ia e taʻu mai pe afai e te lagona le ʻai poʻo le fulafula o ou laugutu.",
+        "tl": "Sabihin sa akin kung nararamdaman mo ang itching o ang iyong mga labi ay gumulong.",
+        "vi": "Hãy nói với tôi nếu bạn bị ngứa hoặc đôi môi của bạn sưng.",
+        "zh": "告诉我,你是否感觉到点心或嘴唇膨胀."
+      }
     },
     {
       "key": "p036",
       "version": 1,
       "category": "symptoms",
       "text": "Point to where it hurts.",
-      "translations": {}
+      "translations": {},
+      "drafts": {
+        "ar": "اشير إلى المكان الذي يؤلم.",
+        "es": "Señala donde duele.",
+        "fa": "به جایی که درد می کنه اشاره کن",
+        "hi": "जहां यह दर्द होता है इंगित करें।",
+        "ja": "痛みを指摘する",
+        "ko": "상처가 있는 곳을 가리키세요.",
+        "lo": "ຊີ້ໃຫ້ເຫັນບ່ອນທີ່ມັນເຈັບ.",
+        "mi": "Tukuna ki te wahi e mamae ana.",
+        "pa": "ਉਸ ਥਾਂ ਵੱਲ ਇਸ਼ਾਰਾ ਕਰੋ ਜਿੱਥੇ ਇਹ ਦਰਦ ਕਰਦਾ ਹੈ।",
+        "prs": "به جایی که درد می کنه اشاره کن",
+        "sm": "Faasino i le mea e tiga ai.",
+        "tl": "Ipakita kung saan ito nasasaktan.",
+        "vi": "Chỉ ra nơi nó đau.",
+        "yue": "指向傷痛嘅地方",
+        "zh": "指向它疼的地方."
+      }
     },
     {
       "key": "p037",
       "version": 1,
       "category": "symptoms",
       "text": "Is the pain getting worse?",
-      "translations": {}
+      "translations": {},
+      "drafts": {
+        "ar": "هل الألم يزداد سوءاً؟",
+        "es": "¿Se está empeorando el dolor?",
+        "fa": "درد داره بدتر ميشه؟",
+        "hi": "दर्द बढ़ रहा है?",
+        "ja": "痛みが悪化してるの?",
+        "ko": "통증이 더 심해졌나요?",
+        "lo": "ຄວາມເຈັບປວດ ກໍາ ລັງຮ້າຍແຮງຂຶ້ນບໍ?",
+        "mi": "Kei te kaha ake te mamae?",
+        "pa": "ਕੀ ਦਰਦ ਵਧਦਾ ਜਾ ਰਿਹਾ ਹੈ?",
+        "prs": "درد داره بدتر میشه؟",
+        "sm": "Po o faateteleina le tiga?",
+        "tl": "Nagiging mas masakit ba ang sakit?",
+        "vi": "Đau đang trở nên tồi tệ hơn không?",
+        "yue": "疼痛愈嚟愈嚴重?",
+        "zh": "疼痛越来越严重吗?"
+      }
     },
     {
       "key": "p038",
       "version": 1,
       "category": "symptoms",
       "text": "On a scale of 1 to 10, how bad is the pain?",
-      "translations": {}
+      "translations": {},
+      "drafts": {
+        "ar": "على مقياس من 1 إلى 10، ما مدى سوء الألم؟",
+        "es": "En una escala de 1 a 10, ¿qué tan fuerte es el dolor?",
+        "fa": "در مقیاس 1 تا 10، درد چقدر سخته؟",
+        "hi": "1 से 10 के पैमाने पर दर्द कितना बुरा है?",
+        "ja": "1から10までのスケールで 痛みはどれくらい大きいのか?",
+        "ko": "1~10의 스케일에서 통증이 얼마나 심할까요?",
+        "lo": "ໃນລະດັບ 1 ຫາ 10, ຄວາມເຈັບປວດແມ່ນຮ້າຍແຮງປານໃດ?",
+        "mi": "I runga i te paerewa 1 ki te 10, he aha te kino o te mamae?",
+        "pa": "1 ਤੋਂ 10 ਦੇ ਪੈਮਾਨੇ 'ਤੇ ਦਰਦ ਕਿੰਨਾ ਮਾੜਾ ਹੈ?",
+        "prs": "در مقیاس 1 تا 10، درد چقدر زیاد است؟",
+        "sm": "I se fua faatatau o le 1 i le 10, o le ā le tele o le tiga?",
+        "tl": "Sa isang sukat ng 1 hanggang 10, gaano kahirap ang sakit?",
+        "vi": "Trên thang điểm từ 1 đến 10, cơn đau nặng như thế nào?",
+        "yue": "喺 1 到 10 嘅規模上,痛楚有幾嚴重?",
+        "zh": "在1到10的尺度上,疼痛是多么严重?"
+      }
     },
     {
       "key": "p039",
       "version": 1,
       "category": "symptoms",
       "text": "Do you feel dizzy or faint?",
-      "translations": {}
+      "translations": {},
+      "drafts": {
+        "ar": "هل تشعرين بالدوار أو بالإحساس بالفقر؟",
+        "es": "¿Te sientes mareado o desmayado?",
+        "fa": "سرگیجه داری یا بی هوشیاری؟",
+        "hi": "क्या आपको उलझन या बेहोश महसूस हो रहा है?",
+        "ja": "気まぐれや昏睡感はありますか?",
+        "ko": "어지럼증을 느끼나요?",
+        "lo": "ທ່ານຮູ້ສຶກວຸ້ນວາຍຫລືລົ້ມຫຼວບໍ?",
+        "mi": "Kei te ngenge koe, kei te ngenge rānei?",
+        "pa": "ਕੀ ਤੁਸੀਂ ਚੁਬੱਚਾ ਜਾਂ ਬੇਹੋਸ਼ ਮਹਿਸੂਸ ਕਰਦੇ ਹੋ?",
+        "prs": "آیا سرگیجه یا بی هوشیاری دارید؟",
+        "sm": "Pe e te lagona le maʻi po o le vaivai?",
+        "tl": "Nararamdaman mo ba ang dizziness o pagkabalisa?",
+        "vi": "Bạn có cảm thấy chóng mặt hay mất trí không?"
+      }
     },
     {
       "key": "p040",
       "version": 1,
       "category": "symptoms",
       "text": "Are you bleeding?",
-      "translations": {}
+      "translations": {},
+      "drafts": {
+        "ar": "هل تنزف؟",
+        "es": "¿Estás sangrando?",
+        "fa": "خونریزی داری؟",
+        "hi": "क्या आपको खून बह रहा है?",
+        "ja": "血が流れているか?",
+        "ko": "피를 흘리고 있어?",
+        "lo": "ເຈົ້າເລືອດອອກບໍ?",
+        "mi": "Kei te toto koe?",
+        "pa": "ਕੀ ਤੁਹਾਨੂੰ ਖੂਨ ਹੋ ਰਿਹਾ ਹੈ?",
+        "prs": "خونریزی می کنی؟",
+        "sm": "Po o e toto?",
+        "tl": "Nagdurusa ka ba?",
+        "vi": "Anh chảy máu à?",
+        "yue": "你有冇出血?",
+        "zh": "你出血了吗?"
+      }
     },
     {
       "key": "p041",
       "version": 1,
       "category": "symptoms",
       "text": "Have your waters broken?",
-      "translations": {}
+      "translations": {},
+      "drafts": {
+        "ar": "هل كسرت مياهك؟",
+        "es": "¿Se han roto tus aguas?",
+        "fa": "آبت شکسته؟",
+        "hi": "क्या आपके पानी टूट गए हैं?",
+        "ja": "水が壊れたのか?",
+        "ko": "물이 끊어졌어?",
+        "lo": "ນ້ ໍາ ຂອງເຈົ້າແຕກແລ້ວບໍ?",
+        "mi": "Kua pakaru tō wai?",
+        "pa": "ਕੀ ਤੁਹਾਡੇ ਪਾਣੀ ਟੁੱਟ ਗਏ ਹਨ?",
+        "prs": "آب های شما شکسته؟",
+        "sm": "Pe ua motusia ou vai?",
+        "tl": "Ang iyong tubig ay nasira?",
+        "vi": "Nước của anh bị vỡ chưa?",
+        "yue": "你嘅水是否破壞咗?",
+        "zh": "你的水是否破裂了?"
+      }
     },
     {
       "key": "p042",
       "version": 1,
       "category": "symptoms",
       "text": "Can you feel the baby moving?",
-      "translations": {}
+      "translations": {},
+      "drafts": {
+        "ar": "هل تشعر بالطفل يتحرك؟",
+        "es": "¿Puedes sentir el bebé moviéndose?",
+        "fa": "ميتوني احساس کني که بچه حرکت ميکنه؟",
+        "hi": "क्या आप बच्चे को आगे बढ़ते महसूस कर सकते हैं?",
+        "ja": "赤ちゃんが動くのを感じますか?",
+        "ko": "아기의 움직임을 느낄 수 있나요?",
+        "lo": "ທ່ານຮູ້ສຶກວ່າເດັກນ້ອຍກໍາລັງເຄື່ອນໄຫວໄດ້ບໍ?",
+        "mi": "Ka taea e koe te kite i te nekehanga o te tamaiti?",
+        "pa": "ਕੀ ਤੁਸੀਂ ਬੱਚੇ ਨੂੰ ਚਲਦੇ ਮਹਿਸੂਸ ਕਰ ਸਕਦੇ ਹੋ?",
+        "prs": "می تونید بچه رو حرکت کنید؟",
+        "sm": "Pe e te lagona le siʻitia o le pepe?",
+        "tl": "Nararamdaman mo bang naglilipat ang sanggol?",
+        "vi": "Anh có cảm thấy em bé chuyển động không?",
+        "yue": "你能感受到嬰兒移動嗎?",
+        "zh": "你能感觉到婴儿移动吗?"
+      }
     },
     {
       "key": "p043",
       "version": 1,
       "category": "symptoms",
       "text": "Are you having contractions?",
-      "translations": {}
+      "translations": {},
+      "drafts": {
+        "ar": "هل لديك انقباضات؟",
+        "es": "¿Tienes contracciones?",
+        "fa": "تو دچار انقباضات هستي؟",
+        "hi": "क्या आपको संकुचन हो रहा है?",
+        "ja": "収縮してるの?",
+        "ko": "수축이 나나요?",
+        "lo": "ເຈົ້າມີ contractions ບໍ?",
+        "mi": "Kei te raru koe?",
+        "pa": "ਕੀ ਤੁਹਾਡੇ ਕੋਲ ਸੰਕੁਚਨ ਹਨ?",
+        "prs": "آیا شما انقباضات دارید؟",
+        "sm": "Po o iai ni ou faalogona faalētonu?",
+        "tl": "Mayroon ka bang contractions?",
+        "vi": "Anh có bị thu hẹp không?",
+        "yue": "你有收縮嗎?",
+        "zh": "你有收缩吗?"
+      }
     },
     {
       "key": "p044",
       "version": 1,
       "category": "symptoms",
       "text": "Do you feel sick?",
-      "translations": {}
+      "translations": {},
+      "drafts": {
+        "ar": "هل تشعرين بالمرض؟",
+        "es": "¿Te sientes enfermo?",
+        "fa": "حالت خوبه؟",
+        "hi": "क्या आप बीमार महसूस करते हैं?",
+        "ja": "病気になったの?",
+        "ko": "병든가?",
+        "lo": "ທ່ານຮູ້ສຶກບໍ່ດີບໍ?",
+        "mi": "Kei te kino koe?",
+        "pa": "ਕੀ ਤੁਸੀਂ ਬਿਮਾਰ ਮਹਿਸੂਸ ਕਰਦੇ ਹੋ?",
+        "prs": "احساس مریضیت می کنه؟",
+        "sm": "Po o e maʻi?",
+        "tl": "Nararamdaman mo bang masakit?",
+        "vi": "Anh có cảm thấy ốm không?",
+        "yue": "你覺得病唔好嗎?",
+        "zh": "你觉得不好吗?"
+      }
     },
     {
       "key": "p045",
       "version": 1,
       "category": "examinations",
       "text": "I am going to check your blood pressure.",
-      "translations": {}
+      "translations": {},
+      "drafts": {
+        "ar": "سأقوم بفحص ضغط دمك",
+        "es": "Voy a comprobar tu presión arterial.",
+        "fa": "میخوام فشار خونت رو چک کنم.",
+        "hi": "मैं आपके रक्तचाप की जांच करने जा रहा हूँ.",
+        "ja": "血圧をチェックする",
+        "ko": "혈압을 확인해볼게요",
+        "lo": "ຂ້ອຍຈະກວດຄວາມກົດດັນເລືອດຂອງທ່ານ.",
+        "mi": "Ka tirohia e au tō pēhanga toto.",
+        "pa": "ਮੈਂ ਤੁਹਾਡੇ ਬਲੱਡ ਪ੍ਰੈਸ਼ਰ ਦੀ ਜਾਂਚ ਕਰਾਂਗਾ।",
+        "prs": "من میخوام فشار خونت رو چک کنم",
+        "sm": "O le a ou siakiina lou toto.",
+        "tl": "Susuriin ko ang iyong presyon ng dugo.",
+        "vi": "Tôi sẽ kiểm tra huyết áp của anh.",
+        "yue": "我會檢查你嘅血壓",
+        "zh": "我会检查你的血压."
+      }
     },
     {
       "key": "p046",
       "version": 1,
       "category": "examinations",
       "text": "I am going to listen to your baby's heartbeat.",
-      "translations": {}
+      "translations": {},
+      "drafts": {
+        "ar": "سأستمع إلى نبض قلب طفلك",
+        "es": "Voy a escuchar el latido cardíaco de tu bebé.",
+        "fa": "من ميخوام صداي قلب بچه ات رو بشنوم",
+        "hi": "मैं आपके बच्चे के दिल की धड़कन सुनने जा रहा हूँ.",
+        "ja": "私はあなたの赤ちゃんの心拍子を聴くつもりだ.",
+        "ko": "아기의 심장 박동을 들어보겠습니다.",
+        "lo": "ຂ້ອຍຈະຟັງການຕີຂອງລູກເຈົ້າ.",
+        "mi": "Kei te haere ahau ki te whakarongo ki te tangi o te ngakau o to tamaiti.",
+        "pa": "ਮੈਂ ਤੁਹਾਡੇ ਬੱਚੇ ਦੇ ਦਿਲ ਦੀ ਧੜਕਣ ਨੂੰ ਸੁਣਨ ਜਾ ਰਿਹਾ ਹਾਂ।",
+        "prs": "من میخوام به ضرب قلب بچه ات گوش بدم",
+        "sm": "O le a ou faalogo i le fatu o lau pepe.",
+        "tl": "Makikinig ako sa pagsabog ng puso ng iyong sanggol.",
+        "vi": "Tôi sẽ nghe nhịp tim của em bé.",
+        "yue": "我會聽你嬰兒嘅心跳",
+        "zh": "我会听你的宝宝的心跳."
+      }
     },
     {
       "key": "p047",
       "version": 1,
       "category": "examinations",
       "text": "I need to feel your tummy.",
-      "translations": {}
+      "translations": {},
+      "drafts": {
+        "ar": "أريد أن أشعر بطنك",
+        "es": "Necesito sentir tu vientre.",
+        "fa": "بايد شکمت رو حس کنم.",
+        "hi": "मुझे आपके पेट को महसूस करने की जरूरत है।",
+        "ja": "腹を感じる必要がある",
+        "ko": "난 네 배를 느낄 필요가 있어",
+        "lo": "ຂ້ອຍຕ້ອງການຮູ້ສຶກກັບທ້ອງຂອງເຈົ້າ.",
+        "mi": "E hiahia ana ahau ki te ite i tou kopu.",
+        "pa": "ਮੈਨੂੰ ਤੁਹਾਡੇ ਢਿੱਡ ਨੂੰ ਮਹਿਸੂਸ ਕਰਨ ਦੀ ਲੋੜ ਹੈ.",
+        "prs": "میخوام شکمت رو حس کنم",
+        "sm": "E tatau ona ou lagona lou manava.",
+        "tl": "Kailangan kong maramdaman ang iyong tiyan.",
+        "vi": "Tôi cần cảm nhận bụng của cô.",
+        "yue": "我需要感受你肚子.",
+        "zh": "我需要感觉到你的肚子."
+      }
     },
     {
       "key": "p048",
       "version": 1,
       "category": "examinations",
       "text": "I need to do an internal examination. Is that okay?",
-      "translations": {}
+      "translations": {},
+      "drafts": {
+        "ar": "أريد إجراء فحص داخلي هل هذا جيد؟",
+        "es": "Necesito hacer un examen interno. ¿Eso está bien?",
+        "fa": "من بايد يه امتحان داخلي انجام بدم. خوبه؟",
+        "hi": "मुझे एक आंतरिक परीक्षा करनी है। क्या यह ठीक है?",
+        "ja": "内部検査が必要だ わかったか?",
+        "ko": "내장검사를 해야 해요 괜찮아?",
+        "lo": "ຂ້ອຍຕ້ອງເຮັດການກວດພາຍໃນ. ມັນບໍ່ເປັນຫຍັງ?",
+        "mi": "Me whakamātautau ā-roto ahau. He pai ki a koe?",
+        "pa": "ਮੈਨੂੰ ਅੰਦਰੂਨੀ ਜਾਂਚ ਕਰਨ ਦੀ ਲੋੜ ਹੈ। ਕੀ ਇਹ ਠੀਕ ਹੈ?",
+        "prs": "من باید یک آزمایش داخلی انجام بدم اینجوری میشه؟",
+        "sm": "E tatau ona ou faia se suʻesuʻega i totonu. Pe e talafeagai?",
+        "tl": "Kailangan kong gumawa ng isang panloob na pagsusuri. Okay ba iyon?",
+        "vi": "Tôi cần phải kiểm tra nội bộ. Không sao à?",
+        "yue": "我需要做一個內部檢查 係咪可以?",
+        "zh": "我需要做一个内部检查. 这是可以吗?"
+      }
     },
     {
       "key": "p049",
       "version": 1,
       "category": "examinations",
       "text": "This may feel cold.",
-      "translations": {}
+      "translations": {},
+      "drafts": {
+        "ar": "هذا قد يشعر بالبرد",
+        "es": "Esto puede sentirse frío.",
+        "fa": "ممکنه سرد باشه",
+        "hi": "यह ठंडा लग सकता है.",
+        "ja": "寒いかも",
+        "ko": "추워질 수도 있어요",
+        "lo": "ມັນອາດຈະຮູ້ສຶກເຢັນ.",
+        "mi": "Tērā pea he makariri tēnei.",
+        "pa": "ਇਹ ਠੰਡਾ ਮਹਿਸੂਸ ਕਰ ਸਕਦਾ ਹੈ.",
+        "prs": "این ممکن است سرد باشد.",
+        "sm": "Atonu e malulu lenei mea.",
+        "tl": "Maaaring malamig ito.",
+        "vi": "Điều này có thể cảm thấy lạnh.",
+        "yue": "呢個可能會覺得好冷",
+        "zh": "这可能会感觉很冷."
+      }
     },
     {
       "key": "p050",
       "version": 1,
       "category": "examinations",
       "text": "This may hurt for a moment.",
-      "translations": {}
+      "translations": {},
+      "drafts": {
+        "ar": "هذا قد يؤلم للحظة",
+        "es": "Esto puede doler por un momento.",
+        "fa": "این ممکن است برای لحظه ای دردناک باشد.",
+        "hi": "यह एक पल के लिए दर्द हो सकता है.",
+        "ja": "ちょっと痛いかも",
+        "ko": "잠시 동안 아프게 될 수도 있어요",
+        "lo": "ມັນອາດຈະເຈັບປວດເປັນເວລາດົນ.",
+        "mi": "Ka mamae pea tēnei mō tētahi wā.",
+        "pa": "ਇਹ ਇੱਕ ਪਲ ਲਈ ਦਰਦ ਹੋ ਸਕਦਾ ਹੈ.",
+        "prs": "این ممکن است برای یک لحظه درد کند.",
+        "sm": "Atonu e tigā lenei mea mo sina taimi.",
+        "tl": "Maaaring masakit ito sa isang sandali.",
+        "vi": "Điều này có thể làm tổn thương cho một lúc.",
+        "yue": "呢個可能會痛一刻.",
+        "zh": "这可能会伤害一会儿."
+      }
     },
     {
       "key": "p051",
       "version": 1,
       "category": "examinations",
       "text": "I need to take some blood.",
-      "translations": {}
+      "translations": {},
+      "drafts": {
+        "ar": "أريد أخذ بعض الدم",
+        "es": "Necesito tomar sangre.",
+        "fa": "باید خون بگیرم",
+        "hi": "मुझे कुछ खून लेने की जरूरत है.",
+        "ja": "血液検査が必要だ",
+        "ko": "피를 가져가야 해",
+        "lo": "ຂ້ອຍຕ້ອງການເອົາເລືອດ.",
+        "mi": "E hiahia ana ahau ki te tango i etahi toto.",
+        "pa": "ਮੈਨੂੰ ਕੁਝ ਲਹੂ ਲੈਣ ਦੀ ਲੋੜ ਹੈ.",
+        "prs": "من باید خون بگیرم",
+        "sm": "Ou te manaʻomia se vaega toto.",
+        "tl": "Kailangan kong kumuha ng ilang dugo.",
+        "vi": "Tôi cần lấy máu.",
+        "yue": "我需要採取啲血",
+        "zh": "我需要一些血液."
+      }
     },
     {
       "key": "p052",
       "version": 1,
       "category": "medication",
       "text": "I am going to give you some pain relief.",
-      "translations": {}
+      "translations": {},
+      "drafts": {
+        "ar": "سأعطيكِ بعض التخفيف من الألم",
+        "es": "Te voy a dar un poco de alivio del dolor.",
+        "fa": "ميخوام بهت يه کم کم درد بدم.",
+        "hi": "मैं तुम्हें कुछ दर्द राहत देने जा रहा हूँ.",
+        "ja": "痛みを軽減する",
+        "ko": "아픔을 덜어줄게",
+        "lo": "ຂ້ອຍຈະຊ່ວຍທ່ານໃຫ້ຜ່ອນຜັນຄວາມເຈັບປວດ.",
+        "mi": "Ka hoatu e ahau ki a koutou etahi mamae mamae.",
+        "pa": "ਮੈਂ ਤੁਹਾਨੂੰ ਕੁਝ ਦਰਦ ਤੋਂ ਰਾਹਤ ਦੇਵਾਂਗਾ।",
+        "prs": "من میخوام براتون یه کم کم درد بدم",
+        "sm": "O le a ou fesoasoani iā te oe e faaitiitia ai lou tiga.",
+        "tl": "Ibibigay ko sa iyo ng ilang pain relief.",
+        "vi": "Tôi sẽ giúp cậu giảm đau một chút.",
+        "yue": "我會幫你減輕痛楚",
+        "zh": "我会给你一些疼痛缓解."
+      }
     },
     {
       "key": "p053",
       "version": 1,
       "category": "medication",
       "text": "This is an antibiotic.",
-      "translations": {}
+      "translations": {},
+      "drafts": {
+        "ar": "هذا مضاد حيوي",
+        "es": "Esto es un antibiótico.",
+        "fa": "این یک آنتی بیوتیک است.",
+        "hi": "यह एक एंटीबायोटिक है।",
+        "ja": "これは抗生物質です",
+        "ko": "이것은 항생제입니다.",
+        "lo": "ນີ້ແມ່ນຢາຕ້ານເຊື້ອ.",
+        "mi": "He mate whakamate tēnei.",
+        "pa": "ਇਹ ਇੱਕ ਐਂਟੀਬਾਇਓਟਿਕ ਹੈ।",
+        "prs": "این یک آنتی بیوتیک است.",
+        "sm": "O se vailaʻau faʻamaʻi lenei.",
+        "tl": "Ito ay isang antibiotic.",
+        "vi": "Đây là thuốc kháng sinh.",
+        "yue": "呢個係抗生素.",
+        "zh": "这是一种抗生素."
+      }
     },
     {
       "key": "p054",
       "version": 1,
       "category": "medication",
       "text": "This will make you sleepy.",
-      "translations": {}
+      "translations": {},
+      "drafts": {
+        "ar": "هذا سيجعلك نائماً",
+        "es": "Esto te hará dormir.",
+        "fa": "اين باعث ميشه بخوابي.",
+        "hi": "इससे आपको नींद आ जाएगी।",
+        "ja": "これはあなたを眠らせるでしょう.",
+        "ko": "이것은 당신을 잠들게 할 것입니다.",
+        "lo": "ນີ້ຈະເຮັດໃຫ້ທ່ານນອນ.",
+        "mi": "Mā tēnei e moe ai koe.",
+        "pa": "ਇਹ ਤੁਹਾਨੂੰ ਨੀਂਦ ਆਵੇਗੀ।",
+        "prs": "این باعث میشه بخوابید",
+        "sm": "O le a faavaivaia ai oe.",
+        "tl": "Gagawin ka ng matutulog.",
+        "vi": "Điều này sẽ khiến cô buồn ngủ.",
+        "yue": "呢樣會令你昏昏欲睡",
+        "zh": "这会让你睡觉."
+      }
     },
     {
       "key": "p055",
       "version": 1,
       "category": "medication",
       "text": "Tell me if you feel any different after this.",
-      "translations": {}
+      "translations": {},
+      "drafts": {
+        "ar": "أخبرني إذا شعرت بأيّ شيء مختلف بعد هذا.",
+        "es": "Dime si te sientes diferente después de esto.",
+        "fa": "بهم بگو اگه بعد از اين احساس ديگه اي داري",
+        "hi": "मुझे बताओ अगर आप इस के बाद कुछ अलग महसूस करते हैं.",
+        "ja": "これからの気分が変わったら教えてくれ",
+        "ko": "이 일이 끝나면 기분이 달라진다면 말해줘",
+        "lo": "ບອກຂ້ອຍຖ້າເຈົ້າຮູ້ສຶກແຕກຕ່າງຈາກສິ່ງນີ້.",
+        "mi": "Korero mai mēnā ka rerekē tō whakaaro i muri i tēnei.",
+        "pa": "ਮੈਨੂੰ ਦੱਸੋ ਜੇ ਤੁਸੀਂ ਇਸ ਤੋਂ ਬਾਅਦ ਕੁਝ ਵੱਖਰਾ ਮਹਿਸੂਸ ਕਰਦੇ ਹੋ.",
+        "prs": "اگه بعد از اين احساس ديگه اي داري بهم بگو",
+        "sm": "Taʻu mai pe afai e te lagona se eseesega pe a uma lenei mea.",
+        "tl": "Sabihin sa akin kung nararamdaman mo ang iba pagkatapos nito.",
+        "vi": "Nói cho tôi biết nếu anh cảm thấy khác biệt sau chuyện này.",
+        "yue": "話畀我聽,如果你覺得後面有咩唔同",
+        "zh": "告诉我,你觉得之后会有什么不同."
+      }
     },
     {
       "key": "p056",
       "version": 1,
       "category": "medication",
       "text": "You can have this every 4 hours.",
-      "translations": {}
+      "translations": {},
+      "drafts": {
+        "ar": "يمكنك الحصول على هذا كل 4 ساعات.",
+        "es": "Puedes tener esto cada 4 horas.",
+        "fa": "هر 4 ساعت مي توني اينو داشته باشي.",
+        "hi": "आप इसे हर 4 घंटे में ले सकते हैं।",
+        "ja": "4時間ごとに飲める",
+        "ko": "4시간마다 받을 수 있습니다.",
+        "lo": "ທ່ານສາມາດໄດ້ຮັບສິ່ງນີ້ທຸກໆ 4 ຊົ່ວໂມງ.",
+        "mi": "Ka taea e koe te tiki i tenei i ia 4 haora.",
+        "pa": "ਤੁਸੀਂ ਇਸਨੂੰ ਹਰ 4 ਘੰਟਿਆਂ ਵਿੱਚ ਲੈ ਸਕਦੇ ਹੋ।",
+        "prs": "شما میتونید هر 4 ساعت اینو داشته باشید",
+        "sm": "E mafai ona e faia lenei mea i le 4 itula uma.",
+        "tl": "Maaari mong magkaroon ng ito bawat 4 oras.",
+        "vi": "Bạn có thể có điều này mỗi 4 giờ.",
+        "yue": "你可以每四個小時都有呢個",
+        "zh": "你可以每4个小时吃一次."
+      }
     },
     {
       "key": "p057",
       "version": 1,
       "category": "consent",
       "text": "I need your permission to do this.",
-      "translations": {}
+      "translations": {},
+      "drafts": {
+        "ar": "أحتاج إلى إذنك للقيام بذلك",
+        "es": "Necesito tu permiso para hacer esto.",
+        "fa": "برای انجام این کار به اجازه شما نیاز دارم.",
+        "hi": "मुझे यह करने के लिए आपकी अनुमति की आवश्यकता है।",
+        "ja": "私はあなたの許可が必要です.",
+        "ko": "네 허락이 필요해",
+        "lo": "ຂ້ອຍຕ້ອງການອະນຸຍາດຂອງທ່ານເພື່ອເຮັດສິ່ງນີ້.",
+        "mi": "E hiahia ana ahau ki tō whakaaetanga ki te mahi i tēnei.",
+        "pa": "ਮੈਨੂੰ ਇਸ ਨੂੰ ਕਰਨ ਲਈ ਤੁਹਾਡੀ ਇਜਾਜ਼ਤ ਦੀ ਲੋੜ ਹੈ.",
+        "prs": "برای انجام این کار به اجازه شما نیاز دارم",
+        "sm": "Ou te manaʻomia lau faatagaga e fai ai lenei mea.",
+        "tl": "Kailangan ko ang iyong pahintulot upang gawin ito.",
+        "vi": "Tôi cần sự cho phép của anh để làm điều này.",
+        "yue": "我需要你同意去做呢件事.",
+        "zh": "我需要你的许可."
+      }
     },
     {
       "key": "p058",
       "version": 1,
       "category": "consent",
       "text": "Do you agree?",
-      "translations": {}
+      "translations": {},
+      "drafts": {
+        "ar": "أتوافقين؟",
+        "es": "¿Estás de acuerdo?",
+        "fa": "شما موافقین؟",
+        "hi": "क्या आप सहमत हैं?",
+        "ja": "納得する?",
+        "ko": "동의하시나요?",
+        "lo": "ທ່ານເຫັນດີບໍ?",
+        "mi": "E whakaae ana koe?",
+        "pa": "ਕੀ ਤੁਸੀਂ ਸਹਿਮਤ ਹੋ?",
+        "prs": "شما موافقین؟",
+        "sm": "Pe e te malilie i ai?",
+        "tl": "Sumasang-ayon ka ba?",
+        "vi": "Anh có đồng ý không?",
+        "yue": "你係咪同意呢?",
+        "zh": "你同意吗?"
+      }
     },
     {
       "key": "p059",
       "version": 1,
       "category": "consent",
       "text": "You can say no.",
-      "translations": {}
+      "translations": {},
+      "drafts": {
+        "ar": "يمكنك أن تقول لا",
+        "es": "Puedes decir que no.",
+        "fa": "می تونی بگی نه",
+        "hi": "आप नहीं कह सकते।",
+        "ja": "断っていいよ",
+        "ko": "거절할 수 있어",
+        "lo": "ທ່ານ ສາ ມາດ ກ່າວ ວ່າ ບໍ່.",
+        "mi": "Ka taea e koe te mea kaore.",
+        "pa": "ਤੁਸੀਂ ਨਾ ਕਹਿ ਸਕਦੇ ਹੋ।",
+        "prs": "میتونی بگی نه",
+        "sm": "E mafai ona e fai atu e leai.",
+        "tl": "Maaari mong sabihin na hindi.",
+        "vi": "Anh có thể nói không.",
+        "yue": "你可以拒絕.",
+        "zh": "你可以拒绝."
+      }
     },
     {
       "key": "p060",
       "version": 1,
       "category": "consent",
       "text": "Do you have any questions?",
-      "translations": {}
+      "translations": {},
+      "drafts": {
+        "ar": "هل لديك أي أسئلة؟",
+        "es": "¿Tiene alguna pregunta?",
+        "fa": "تو یه سوال داری؟",
+        "hi": "क्या आपके कोई प्रश्न हैं?",
+        "ja": "何か質問があるか?",
+        "ko": "질문이 있으신가요?",
+        "lo": "ທ່ານມີຄໍາຖາມໃດແດ່?",
+        "mi": "Kei a koe ētahi pātai?",
+        "pa": "ਕੀ ਤੁਹਾਡੇ ਕੋਈ ਪ੍ਰਸ਼ਨ ਹਨ?",
+        "prs": "سوال های دیگه ای داری؟",
+        "sm": "Pe e iai ni au fesili?",
+        "tl": "Mayroon ka bang anumang mga tanong?",
+        "vi": "Anh có câu hỏi gì không?",
+        "yue": "你有冇任何問題?",
+        "zh": "你有没有任何问题?"
+      }
     },
     {
       "key": "p061",
       "version": 1,
       "category": "surgeries",
       "text": "You need an operation.",
-      "translations": {}
+      "translations": {},
+      "drafts": {
+        "ar": "تحتاجين لعملية",
+        "es": "Necesitas una operación.",
+        "fa": "تو نیاز به عمل داری",
+        "hi": "आप एक ऑपरेशन की जरूरत है.",
+        "ja": "手術が必要だ",
+        "ko": "수술이 필요해요",
+        "lo": "ທ່ານຕ້ອງການການຜ່າຕັດ.",
+        "mi": "E hiahia ana koe ki te mahi.",
+        "pa": "ਤੁਹਾਨੂੰ ਇੱਕ ਆਪਰੇਸ਼ਨ ਦੀ ਲੋੜ ਹੈ.",
+        "prs": "تو نیاز به عمل داری",
+        "sm": "E te manaʻomia se taotoga.",
+        "tl": "Kailangan mo ng operasyon.",
+        "vi": "Anh cần phải phẫu thuật.",
+        "yue": "你需要一個手術",
+        "zh": "你需要手术."
+      }
     },
     {
       "key": "p062",
       "version": 1,
       "category": "surgeries",
       "text": "You will be awake but numb from the waist down.",
-      "translations": {}
+      "translations": {},
+      "drafts": {
+        "ar": "ستكون مستيقظاً، ولكن ستصبح غبياً من الخصر إلى أسفل.",
+        "es": "Estarás despierto pero entumecido desde la cintura hacia abajo.",
+        "fa": "تو از کمر تا پایین بیدار میشی",
+        "hi": "तुम जागोगे लेकिन कमर से नीचे तक numb हो जाओगे।",
+        "ja": "起きても腰から下まで麻痺する",
+        "ko": "당신은 깨어있을 것입니다. 하지만 허리 아래로 numb.",
+        "lo": "ທ່ານຈະຕື່ນ ແຕ່ຈະເສື່ອມເສື່ອມເສື່ອມເສື່ອມເສື່ອມເສື່ອມເສື່ອມເສື່ອມເສື່ອມເສື່ອມ.",
+        "mi": "Ka mataara koe, engari ka ngenge noa iho koe mai i te whitiki ki raro.",
+        "pa": "ਤੁਸੀਂ ਜਾਗਦੇ ਰਹੋਗੇ ਪਰ ਕਮਰ ਤੋਂ ਹੇਠਾਂ ਤੱਕ ਅਮਰ ਹੋ ਜਾਵੋਂਗੇ।",
+        "prs": "تو از کمر تا پایین بیدار میشی",
+        "sm": "O le a e mataala, ae o le a e lagona le lē lavalavā mai i le pito i lalo o le fatafata.",
+        "tl": "Ikaw ay magising, ngunit hindi magagawang mula sa hawak hanggang sa ilalim.",
+        "vi": "Bạn sẽ tỉnh táo nhưng tê liệt từ eo xuống.",
+        "yue": "你會醒返,但從腰向下會麻木.",
+        "zh": "你会觉醒,但从腰部到下来都会昏昏欲睡."
+      }
     },
     {
       "key": "p063",
       "version": 1,
       "category": "surgeries",
       "text": "You will be asleep for the operation.",
-      "translations": {}
+      "translations": {},
+      "drafts": {
+        "ar": "ستنام قبل العملية",
+        "es": "Estarás dormido para la operación.",
+        "fa": "قبل از عمل خوابيدي.",
+        "hi": "आप ऑपरेशन के लिए सो जाएगा.",
+        "ja": "手術前には眠るよ",
+        "ko": "수술 전에 잠들어 있을 거야",
+        "lo": "ທ່ານຈະໄດ້ນອນ ສໍາ ລັບການປະຕິບັດງານ.",
+        "mi": "Ka moe koe i te wā o te mahi.",
+        "pa": "ਆਪ੍ਰੇਸ਼ਨ ਤੋਂ ਪਹਿਲਾਂ ਤੁਸੀਂ ਸੌਂ ਰਹੇ ਹੋਵੋਗੇ।",
+        "prs": "قبل از عمل خواب میشی",
+        "sm": "O le a e moe a o faagasolo le taotoga.",
+        "tl": "Matutulog ka para sa operasyon.",
+        "vi": "Anh sẽ ngủ trước khi phẫu thuật.",
+        "yue": "你會喺手術之前瞓著",
+        "zh": "在手术之前,你会睡觉."
+      }
     },
     {
       "key": "p064",
       "version": 1,
       "category": "surgeries",
       "text": "Your partner can come with you.",
-      "translations": {}
+      "translations": {},
+      "drafts": {
+        "ar": "شريكك يمكن أن يأتي معك.",
+        "es": "Su compañero puede venir con usted.",
+        "fa": "همکارت ميتونه باهات بياد",
+        "hi": "आपका साथी आपके साथ आ सकता है।",
+        "ja": "パートナーも一緒だ",
+        "ko": "파트너는 같이 갈 수 있어",
+        "lo": "ຄູ່ຮ່ວມງານຂອງທ່ານສາມາດມາພ້ອມກັບທ່ານໄດ້.",
+        "mi": "Ka taea e tō hoa mahi te haere tahi.",
+        "pa": "ਤੁਹਾਡਾ ਸਾਥੀ ਤੁਹਾਡੇ ਨਾਲ ਆ ਸਕਦਾ ਹੈ।",
+        "prs": "همکارت ميتونه باهات بياد",
+        "sm": "E mafai ona ō atu lau paaga ma oe.",
+        "tl": "Makakasama ka ng iyong kasosyo.",
+        "vi": "Đối tác của anh có thể đi cùng anh.",
+        "yue": "你嘅伴侶可以同你去",
+        "zh": "你的伴侣可以和你一起去."
+      }
     },
     {
       "key": "p065",
       "version": 1,
       "category": "surgeries",
       "text": "The operation will take about one hour.",
-      "translations": {}
+      "translations": {},
+      "drafts": {
+        "ar": "العملية ستستغرق حوالي ساعة",
+        "es": "La operación tardará aproximadamente una hora.",
+        "fa": "اين عمل يه ساعت طول ميکشه",
+        "hi": "ऑपरेशन में लगभग एक घंटे का समय लगेगा।",
+        "ja": "手術は1時間ほどかかる.",
+        "ko": "수술은 1시간 정도 걸립니다.",
+        "lo": "ການປະຕິບັດງານຈະໃຊ້ເວລາປະມານ 1 ຊົ່ວໂມງ.",
+        "mi": "Ka kotahi haora te roa o te mahi.",
+        "pa": "ਓਪਰੇਸ਼ਨ ਵਿੱਚ ਲਗਭਗ ਇੱਕ ਘੰਟਾ ਲੱਗੇਗਾ।",
+        "prs": "این عمل حدود یک ساعت طول میکشه",
+        "sm": "E tasi le itula le umi e faia ai le taotoga.",
+        "tl": "Ang operasyon ay tumatagal ng halos isang oras.",
+        "vi": "Hoạt động sẽ mất khoảng một giờ.",
+        "yue": "運作需要一個鐘頭左右",
+        "zh": "这将需要一个小时的时间."
+      }
     },
     {
       "key": "p066",
       "version": 1,
       "category": "discharge",
       "text": "You can go home today.",
-      "translations": {}
+      "translations": {},
+      "drafts": {
+        "ar": "يمكنك الذهاب للمنزل اليوم",
+        "es": "Puedes irte a casa hoy.",
+        "fa": "امروز میتونی بری خونه",
+        "hi": "आप आज घर जा सकते हैं।",
+        "ja": "今日は家に帰れる.",
+        "ko": "오늘 집에 갈 수 있어",
+        "lo": "ເຈົ້າສາມາດກັບບ້ານໄດ້ໃນມື້ນີ້.",
+        "mi": "Ka taea e koe te haere ki te kāinga i tenei ra.",
+        "pa": "ਤੁਸੀਂ ਅੱਜ ਘਰ ਜਾ ਸਕਦੇ ਹੋ।",
+        "prs": "امروز میتونی بری خونه",
+        "sm": "E mafai ona e alu i le fale i le asō.",
+        "tl": "Maaari kang umuwi ngayon.",
+        "vi": "Hôm nay anh có thể về nhà.",
+        "yue": "今日你可以返屋企.",
+        "zh": "今天你可以回家."
+      }
     },
     {
       "key": "p067",
       "version": 1,
       "category": "discharge",
       "text": "Come back immediately if the bleeding gets heavier.",
-      "translations": {}
+      "translations": {},
+      "drafts": {
+        "ar": "عد فوراً إذا كان النزيف يزداد قوة",
+        "es": "Vuelve de inmediato si el sangrado se hace más pesado.",
+        "fa": "اگه خونريزي زياد بشه فوراً برگرد",
+        "hi": "यदि रक्तस्राव अधिक हो जाता है तो तुरंत वापस आओ।",
+        "ja": "血が重くなったらすぐに戻って来てください",
+        "ko": "출혈이 심해지면 즉시 돌아오세요.",
+        "lo": "ກັບມາທັນທີຖ້າເລືອດເລືອດເພີ່ມຂຶ້ນ.",
+        "mi": "Whakahoki tonu mēnā ka nui ake te toto.",
+        "pa": "ਜੇ ਖੂਨ ਵਧਦਾ ਹੈ ਤਾਂ ਤੁਰੰਤ ਵਾਪਸ ਆਓ.",
+        "prs": "اگه خونریزی زیاد بشه فوراً برگردین",
+        "sm": "Ia toe foʻi mai i le taimi lava e tasi pe afai e atili ai ona toto.",
+        "tl": "Bumalik ka agad kung ang pagdurugo ay nagiging mas mabigat.",
+        "vi": "Trở lại ngay nếu chảy máu nặng hơn.",
+        "yue": "如果出血越來越嚴重 就立即返去",
+        "zh": "如果出血越来越严重,请立即回来."
+      }
     },
     {
       "key": "p068",
       "version": 1,
       "category": "discharge",
       "text": "Come back if you have a fever.",
-      "translations": {}
+      "translations": {},
+      "drafts": {
+        "ar": "عد إذا كان لديك حمى.",
+        "es": "Vuelve si tienes fiebre.",
+        "fa": "اگه تب داري برگرد",
+        "hi": "यदि आपको बुखार है तो वापस आओ।",
+        "ja": "熱があるなら戻って来てください.",
+        "ko": "발열이 있다면 다시 오세요.",
+        "lo": "ກັບມາຖ້າທ່ານມີໄຂ້.",
+        "mi": "Whakahoki mai mēnā kei te wera koe.",
+        "pa": "ਜੇ ਤੁਹਾਨੂੰ ਬੁਖਾਰ ਹੈ ਤਾਂ ਵਾਪਸ ਆਓ.",
+        "prs": "اگه تب داري برگرد",
+        "sm": "Ia toe foʻi mai pe afai e iai lou fiva.",
+        "tl": "Bumalik ka kung may lagnat ka.",
+        "vi": "Trở lại nếu có sốt.",
+        "yue": "如果你發燒,返去.",
+        "zh": "如果你发烧,请回来."
+      }
     },
     {
       "key": "p069",
       "version": 1,
       "category": "discharge",
       "text": "Take this medicine twice a day.",
-      "translations": {}
+      "translations": {},
+      "drafts": {
+        "ar": "خذ هذا الدواء مرتين في اليوم.",
+        "es": "Tome este medicamento dos veces al día.",
+        "fa": "این دارو را دو بار در روز مصرف کنید.",
+        "hi": "इस दवा को दिन में दो बार लें।",
+        "ja": "この薬を一日2回服用してください.",
+        "ko": "이 약을 하루에 두 번 복용하십시오.",
+        "lo": "ໃຊ້ຢານີ້ສອງຄັ້ງຕໍ່ມື້.",
+        "mi": "Tangohia tēnei rongoā e rua ngā wā i te rā.",
+        "pa": "ਇਹ ਦਵਾਈ ਦਿਨ ਵਿਚ ਦੋ ਵਾਰ ਲਓ।",
+        "prs": "این دارو را دو بار در روز مصرف کنید.",
+        "sm": "Ave lenei fualaau faalua i le aso.",
+        "tl": "Kunin ang gamot na ito dalawang beses sa isang araw.",
+        "vi": "Uống thuốc này hai lần một ngày.",
+        "yue": "每日服用兩次藥物",
+        "zh": "每天服用两次这种药物."
+      }
     },
     {
       "key": "p070",
       "version": 1,
       "category": "discharge",
       "text": "Your follow-up appointment is in one week.",
-      "translations": {}
+      "translations": {},
+      "drafts": {
+        "ar": "موعد المتابعة الخاص بك في أسبوع واحد.",
+        "es": "Su cita es en una semana.",
+        "fa": "مواظبتون بعد از يک هفته",
+        "hi": "आपका अनुवर्ती नियुक्ति एक सप्ताह में है।",
+        "ja": "フォローアップ予約は1週間後です",
+        "ko": "당신의 후속 약속은 한 주 후에입니다.",
+        "lo": "ກໍານົດການຕິດຕາມຂອງທ່ານແມ່ນໃນ ຫນຶ່ງ ອາທິດ.",
+        "mi": "He wiki ka tae mai tō rārangi whai muri.",
+        "pa": "ਤੁਹਾਡੀ ਫਾਲੋ-ਅਪ ਨਿਯੁਕਤੀ ਇਕ ਹਫ਼ਤੇ ਵਿਚ ਹੈ।",
+        "prs": "قرار ملاقات شما بعد از یک هفته است",
+        "sm": "E tasi le vaiaso e sosoo ai lau asiasiga.",
+        "tl": "Ang iyong follow-up appointment ay sa isang linggo.",
+        "vi": "Cuộc hẹn tiếp theo của bạn là trong một tuần.",
+        "yue": "你會喺一個禮拜內再見我",
+        "zh": "接下来的约会在一周内."
+      }
     },
     {
       "key": "p071",
       "version": 1,
       "category": "discharge",
       "text": "Do you have someone to take you home?",
-      "translations": {}
+      "translations": {},
+      "drafts": {
+        "ar": "هل لديكِ شخص ما ليأخذكِ للمنزل؟",
+        "es": "¿Tienes a alguien que te lleve a casa?",
+        "fa": "کسي هست که تو رو ببره خونه؟",
+        "hi": "क्या आपके पास घर ले जाने के लिए कोई है?",
+        "ja": "家に連れて行く人がいるか?",
+        "ko": "집에 데려갈 사람이 있나요?",
+        "lo": "ມີໃຜນໍາເຈົ້າກັບບ້ານບໍ?",
+        "mi": "Kei a koe tetahi hei kawe i a koe ki te kainga?",
+        "pa": "ਕੀ ਤੁਹਾਡੇ ਕੋਲ ਕੋਈ ਹੈ ਜੋ ਤੁਹਾਨੂੰ ਘਰ ਲੈ ਜਾਵੇਗਾ?",
+        "prs": "کسی داری که بیاره تو خونه؟",
+        "sm": "Pe e iai se tasi e ave oe i le fale?",
+        "tl": "Mayroon ka bang isa na dadalhin ka sa bahay?",
+        "vi": "Có ai đưa anh về nhà không?",
+        "yue": "你有冇人帶你返屋企?",
+        "zh": "有没有人带你回家吗?"
+      }
     },
     {
       "key": "p072",
       "version": 1,
       "category": "patient_replies",
       "text": "I am pregnant",
-      "translations": {}
+      "translations": {},
+      "drafts": {
+        "ar": "أنا حامل",
+        "es": "Estoy embarazada.",
+        "fa": "من باردارم",
+        "hi": "मैं गर्भवती हूँ",
+        "ja": "妊娠してる",
+        "ko": "난 임신중이야",
+        "lo": "ຂ້ອຍຖືພາ",
+        "mi": "Kei te hapu ahau",
+        "pa": "ਮੈਂ ਗਰਭਵਤੀ ਹਾਂ",
+        "prs": "من باردارم",
+        "sm": "Ua ou maitaga.",
+        "tl": "Ako'y buntis",
+        "vi": "Tôi đang mang thai.",
+        "yue": "我懷孕了",
+        "zh": "我怀孕了."
+      }
     },
     {
       "key": "p073",
       "version": 1,
       "category": "patient_replies",
       "text": "I have an allergy",
-      "translations": {}
+      "translations": {},
+      "drafts": {
+        "ar": "لدي حساسية",
+        "es": "Tengo una alergia .",
+        "fa": "آلرژی دارم",
+        "hi": "मुझे एलर्जी है",
+        "ja": "アレルギーがある",
+        "ko": "알레르기가 있어요",
+        "lo": "ຂ້ອຍມີອາຣເລກ",
+        "mi": "He āwangawanga taku",
+        "pa": "ਮੈਨੂੰ ਐਲਰਜੀ ਹੈ",
+        "prs": "من آلرژی دارم",
+        "sm": "E iai loʻu allergy",
+        "tl": "Ako ay may allergy",
+        "vi": "Tôi bị dị ứng.",
+        "yue": "我有過敏",
+        "zh": "我有过敏."
+      }
     },
     {
       "key": "p074",
       "version": 1,
       "category": "patient_replies",
       "text": "I feel dizzy",
-      "translations": {}
+      "translations": {},
+      "drafts": {
+        "ar": "أشعر بالدوار",
+        "es": "Estoy mareado.",
+        "fa": "من سرگردانم",
+        "hi": "मुझे चक्कर लग रहा है",
+        "ja": "気まぐれを感じてる",
+        "ko": "난 어마어마하게",
+        "lo": "ຂ້ອຍຮູ້ສຶກວຸ້ນວາຍ",
+        "mi": "Kei te ngenge ahau",
+        "pa": "ਮੈਨੂੰ ਚੁਬੱਚਾ ਮਹਿਸੂਸ ਹੁੰਦਾ ਹੈ",
+        "prs": "من سرگردانم",
+        "sm": "Ou te maʻi le mafaufau",
+        "tl": "Nararamdaman kong dizzy",
+        "vi": "Tôi bị chóng mặt."
+      }
     },
     {
       "key": "p075",
       "version": 1,
       "category": "patient_replies",
       "text": "I need water",
-      "translations": {}
+      "translations": {},
+      "drafts": {
+        "ar": "أحتاج إلى ماء",
+        "es": "Necesito agua.",
+        "fa": "من به آب نياز دارم",
+        "hi": "मुझे पानी की जरूरत है",
+        "ja": "水が必要だ",
+        "ko": "물이 필요해",
+        "lo": "ຂ້ອຍຕ້ອງການນ້ ໍາ",
+        "mi": "E hiahia ana ahau ki te wai",
+        "pa": "ਮੈਨੂੰ ਪਾਣੀ ਦੀ ਲੋੜ ਹੈ",
+        "prs": "من به آب نیاز دارم",
+        "sm": "Ou te manaʻomia le vai",
+        "tl": "Kailangan ko ng tubig",
+        "vi": "Tôi cần nước.",
+        "yue": "我需要水",
+        "zh": "我需要水."
+      }
     },
     {
       "key": "p076",
       "version": 1,
       "category": "patient_replies",
       "text": "Please slow down",
-      "translations": {}
+      "translations": {},
+      "drafts": {
+        "ar": "من فضلك أبطأ",
+        "es": "Por favor, ralentiza.",
+        "fa": "لطفاً آهسته تر",
+        "hi": "कृपया धीमा करें",
+        "ja": "ゆっくりしてください",
+        "ko": "좀 느려주세요",
+        "lo": "ກະລຸນາຊ້າລົງ",
+        "mi": "Tena koa whakamutua",
+        "pa": "ਕਿਰਪਾ ਕਰਕੇ ਹੌਲੀ ਕਰੋ",
+        "prs": "خواهش می کنم آهسته تر",
+        "sm": "Faamolemole faaitiitia le saoasaoa",
+        "tl": "Mangyaring mabagal",
+        "vi": "Làm ơn chậm lại.",
+        "yue": "請放慢速度",
+        "zh": "请放慢速度"
+      }
     },
     {
       "key": "p077",
       "version": 1,
       "category": "patient_replies",
       "text": "I want my partner here",
-      "translations": {}
+      "translations": {},
+      "drafts": {
+        "ar": "أريد شريكي هنا",
+        "es": "Quiero a mi compañero aquí .",
+        "fa": "من همکارم رو میخوام اینجا",
+        "hi": "मैं अपने साथी को यहाँ चाहता हूँ",
+        "ja": "パートナーをここに欲しい",
+        "ko": "제 파트너가 여기 있으면 좋겠습니다",
+        "lo": "ຂ້ອຍຢາກມີຄູ່ຮ່ວມງານຂອງຂ້ອຍຢູ່ບ່ອນນີ້",
+        "mi": "Kei te hiahia ahau ki taku hoa ki konei",
+        "pa": "ਮੈਂ ਆਪਣੇ ਸਾਥੀ ਨੂੰ ਇੱਥੇ ਚਾਹੁੰਦਾ ਹਾਂ",
+        "prs": "من همکارم رو اینجا میخوام",
+        "sm": "Ou te manaʻo i laʻu paaga iinei",
+        "tl": "Gusto ko ang aking kasamahan dito",
+        "vi": "Tôi muốn đối tác của tôi ở đây.",
+        "yue": "我想要我同事嚟",
+        "zh": "我想要我的伴侣在这里"
+      }
     },
     {
       "key": "p078",
       "version": 1,
       "category": "patient_replies",
       "text": "I am scared",
-      "translations": {}
+      "translations": {},
+      "drafts": {
+        "ar": "أنا خائفة",
+        "es": "Estoy asustada.",
+        "fa": "من میترسم",
+        "hi": "मैं डर गया हूँ",
+        "ja": "怖がってる",
+        "ko": "난 무서워",
+        "lo": "ຂ້ອຍຢ້ານ",
+        "mi": "Kei te mataku ahau",
+        "pa": "ਮੈਨੂੰ ਡਰ ਹੈ",
+        "prs": "من می ترسم",
+        "sm": "Ua ou fefe.",
+        "tl": "Natatakot ako.",
+        "vi": "Tôi sợ.",
+        "yue": "我好驚",
+        "zh": "我害怕."
+      }
     }
   ]
 }

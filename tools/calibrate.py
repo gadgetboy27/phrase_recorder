@@ -24,7 +24,13 @@ Corpora (downloaded to ~/phrase-recordings/calibration/, never committed):
 
 Scoring is chrF++ (character n-grams 1-6 + word n-grams 1-2, beta=2, corpus level), the standard
 for morphologically rich and low-resource languages — BLEU is too coarse for te reo. Also reported:
-coverage, the share of lines NLLB translated at all (it returns nothing for Tongan).
+coverage, the share of lines NLLB translated at all.
+
+Languages written without spaces between words (zh, yue, ja, lo) are scored with plain chrF, because
+chrF++'s word n-grams see a whole sentence as one token there and the number collapses — Chinese
+first measured 14.4 with translations that were in fact good. Even plain chrF runs low on logographic
+script, so those rows are printed but NOT banded and must not be compared against the others. Use
+them only against the same language over time.
 
 Needs SSH to the Nano (NANO_SSH, as tools/nano.sh sets it). Stdlib only, both ends.
 """
@@ -47,6 +53,9 @@ FLORES_URL = "https://dl.fbaipublicfiles.com/nllb/flores200_dataset.tar.gz"
 TICO_URL = "https://github.com/tico-19/tico-19.github.io/raw/master/data/tico19-testset.zip"
 # our code -> TICO-19's code (FLORES uses the same codes as NLLB, so panel_drafts.NLLB_CODES serves)
 TICO_LANG = {"ar": "ar", "es": "es-LA", "fa": "fa", "prs": "prs", "hi": "hi", "tl": "tl", "zh": "zh"}
+# Written without spaces between words: chrF++'s word n-grams are meaningless, and even chrF is
+# harsh on logographic script. Scored, but never banded or compared with the space-separated ones.
+NO_WORD_SPACES = {"zh", "yue", "ja", "lo"}
 # FLORES/NLLB codes, mirrored from nano/panel_drafts.py so this runs without importing the Nano's modules
 NLLB_CODES = {"en": "eng_Latn", "mi": "mri_Latn", "ar": "arb_Arab", "es": "spa_Latn", "fa": "pes_Arab",
               "prs": "prs_Arab", "hi": "hin_Deva", "vi": "vie_Latn", "zh": "zho_Hans", "yue": "yue_Hant",
@@ -93,13 +102,13 @@ def chrf_stats(hyp, ref, char_order=6, word_order=2):
     return out
 
 
-def chrf_score(pairs, beta=2.0):
+def chrf_score(pairs, beta=2.0, word_order=2):
     """chrF++ ×100 over (hypothesis, reference) pairs, corpus level — matches sacreBLEU 2.6.0's
     corpus_chrf(word_order=2) exactly (checked in tools/test_calibrate.py). A hypothesis of "" scores
     0 and drags the corpus score down: failing to translate a line is a failure, not a line to skip."""
     totals = None
     for hyp, ref in pairs:
-        st = chrf_stats(hyp or "", ref)
+        st = chrf_stats(hyp or "", ref, word_order=word_order)
         totals = st if totals is None else [(a + d, b + e, c + f) for (a, b, c), (d, e, f) in zip(totals, st)]
     if not totals:
         return 0.0
@@ -183,12 +192,14 @@ def translate_on_nano(lang, pairs, beams, ssh):
     return out
 
 
-def band(score, coverage):
+def band(score, coverage, lang=None):
     """Triage bands, not clinical thresholds: they only decide what a human reads first. Coverage is
     called out separately because a good score on the half of the lines a model deigned to translate
     is not a good model — chrF++ already counts the blanks, but the reviewer needs to see why."""
     if coverage < 0.5:
         return "NO MT"
+    if lang in NO_WORD_SPACES:
+        return "not comparable (chrF, no word spaces)" + (f" · {(1 - coverage) * 100:.0f}% blank" if coverage < 0.95 else "")
     base = ("usable draft" if score >= 50 else "review closely" if score >= 40
             else "weak" if score >= 30 else "do not trust")
     if coverage < 0.95:
@@ -246,10 +257,12 @@ def main():
             print(f"  {lang}: done in {time.time() - t0:.0f} s", flush=True)
         refs = [r for _, r in pairs]
         row = {"lang": lang, "corpus": out.get("corpus", a.corpus), "n": len(refs)}
+        wo = 0 if lang in NO_WORD_SPACES else 2
+        row["metric"] = "chrF" if wo == 0 else "chrF++"
         for beam in beams:
             k = f"b{beam}"
             hyps = [r.get(k) for r in out["rows"]][:len(refs)]
-            row[f"chrf{beam}"] = chrf_score(list(zip(hyps, refs)))
+            row[f"chrf{beam}"] = chrf_score(list(zip(hyps, refs)), word_order=wo)
             row[f"cov{beam}"] = sum(1 for h in hyps if h) / len(hyps) if hyps else 0.0
         results.append(row)
 
@@ -263,9 +276,12 @@ def main():
     for r in results:
         cells = "  ".join(f"{r[f'chrf{b}']:>{w}.1f}" for b in beams)
         print(f"{r['lang']:5} {r['n']:>4}  {cells}  {r[f'cov{main_beam}'] * 100:>7.0f}%  "
-              f"{band(r[f'chrf{main_beam}'], r[f'cov{main_beam}'])}")
+              f"{band(r[f'chrf{main_beam}'], r[f'cov{main_beam}'], r['lang'])}")
+    if any(r["lang"] in NO_WORD_SPACES for r in results):
+        print(f"\n{', '.join(r['lang'] for r in results if r['lang'] in NO_WORD_SPACES)}: scored with plain chrF "
+              f"(no word spaces) — read these against themselves over time, never against the rows above.")
     if len(beams) > 1:
-        d = [r[f"chrf{beams[0]}"] - r[f"chrf{beams[1]}"] for r in results]
+        d = [r[f"chrf{beams[0]}"] - r[f"chrf{beams[1]}"] for r in results if r["lang"] not in NO_WORD_SPACES]
         print(f"\nbeam {beams[0]} vs {beams[1]}: mean chrF++ difference {sum(d) / len(d):+.2f} "
               f"(positive = the wider beam is better; the live path uses beam {beams[-1]})")
     out = CACHE / f"report_{a.corpus}_{time.strftime('%Y%m%dT%H%M%SZ', time.gmtime())}.json"

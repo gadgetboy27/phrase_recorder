@@ -69,6 +69,12 @@
   }
   button:disabled { opacity: 0.55; cursor: not-allowed; }
   .btn-record { background: #A63D40; color: #fff; font-weight: 700; flex: 1; min-width: 100%; }
+  /* Machine draft comparison — amber, as on the touch panel, so "unverified" reads the same everywhere. */
+  .btn-compare { background: #F6F4EF; border: 1px solid #C08A2E; color: #6B4E12; font-size: 14px; margin-top: 8px; }
+  .btn-compare:disabled { opacity: .45; }
+  .draft-box { border: 1px solid #C08A2E; border-left-width: 4px; background: #FDF8EE; border-radius: 6px; padding: 10px 12px; margin-top: 8px; }
+  .draft-label { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: #8A6516; font-weight: 700; }
+  .draft-text { font-size: 19px; line-height: 1.45; margin: 6px 0; }
   .btn-record.recording { background: #8A2E30; }
   .btn-secondary { background: #F6F4EF; border: 1px solid #DCD7C9; color: #1B2621; }
   .btn-primary { background: #4A7A68; color: #fff; font-weight: 700; flex: 1; }
@@ -134,7 +140,7 @@
 <script>
 // Phrase recorder v2 — see docs/data-contract.md. Everything this file
 // produces (WAV, filename, manifest.json, zip) is specified there.
-const APP_VERSION = "2.1.1";
+const APP_VERSION = "2.2.0";
 const MANIFEST_VERSION = 1;
 const CONSENT_TEXT_VERSION = 1;
 const CONSENT_TEXT =
@@ -459,11 +465,14 @@ function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;");
 //   adhoc     – volunteer-added phrase: read what they typed
 //   approved  – an approved translation exists: read that
 //   ask       – no translation yet: read the English, optionally type the translation
+// In "ask" mode a machine draft may exist (phrases.json `drafts`). It is deliberately NOT shown
+// until the volunteer has typed something of their own: seeing it first anchors them, and
+// "approved by a native speaker" would quietly come to mean "NLLB's guess, unchallenged".
 function readMode(p, lang) {
   if (p.unmatched) return { kind: "adhoc" };
   if (lang === "en") return { kind: "canonical" };
   const t = (p.translations || {})[lang];
-  return t ? { kind: "approved", text: t } : { kind: "ask" };
+  return t ? { kind: "approved", text: t } : { kind: "ask", draft: (p.drafts || {})[lang] || null };
 }
 
 async function buildBatch(settings, takes) {
@@ -516,6 +525,8 @@ async function App(root) {
     idx: 0,
     pending: null,        // { blob, sampleRate, durationMs, recordedAt } awaiting accept
     typed: {},            // phraseId -> translation typed this session (so take 2 needn't retype)
+    draftSeen: {},        // phraseId -> the volunteer asked to see the machine draft for this phrase
+    draftAdopted: {},     // phraseId -> they took the machine's wording rather than their own
     pendingUrl: null,
     timer: null,
     // batch screen
@@ -613,7 +624,7 @@ async function App(root) {
   function startSession() {
     const cat = state.settings.category;
     state.sessionPhrases = phraseData.phrases.filter((p) => p.category === cat)
-      .map((p) => ({ key: p.key, version: p.version, text: p.text, category: cat, unmatched: false, translations: p.translations || {} }));
+      .map((p) => ({ key: p.key, version: p.version, text: p.text, category: cat, unmatched: false, translations: p.translations || {}, drafts: p.drafts || {} }));
     state.idx = 0;
     discardPending();
     state.screen = "record";
@@ -669,6 +680,41 @@ async function App(root) {
       translationBox.appendChild(translationInput);
       translationBox.appendChild(el("div", { class: "hint", text: "This becomes a draft translation for review. Leave it blank if you'd rather not type — the recording is still saved and the text can be added later." }));
       translationInput.addEventListener("input", () => { state.typed[phraseId(p)] = translationInput.value; });
+
+      // A machine draft exists: offer it only once they have written something, as a second opinion.
+      if (mode.draft) {
+        const id = phraseId(p);
+        const compareBtn = el("button", { class: "btn-compare", text: "Compare with the machine's attempt" });
+        const draftBox = el("div", { class: "draft-box", style: "display:none" });
+        const syncBtn = () => { compareBtn.disabled = !translationInput.value.trim(); };
+        syncBtn();
+        translationInput.addEventListener("input", syncBtn);
+        compareBtn.addEventListener("click", () => {
+          state.draftSeen[id] = true;
+          draftBox.innerHTML = "";
+          draftBox.appendChild(el("div", { class: "draft-label", text: "Machine attempt — unverified, by NLLB-200" }));
+          draftBox.appendChild(el("div", { class: "draft-text", lang: s.language, text: mode.draft }));
+          const same = translationInput.value.trim() === mode.draft.trim();
+          draftBox.appendChild(el("div", { class: "hint", text: same
+            ? "Identical to yours."
+            : "Yours is what will be recorded. Only take the machine's wording if it is genuinely better — it has not been checked by anyone." }));
+          if (!same) {
+            const useBtn = el("button", { class: "btn-compare", text: "Use the machine's wording instead" });
+            useBtn.addEventListener("click", () => {
+              translationInput.value = mode.draft;
+              state.typed[id] = mode.draft;
+              state.draftAdopted[id] = true;
+              draftBox.appendChild(el("div", { class: "hint", text: "Adopted — recorded as machine wording a speaker accepted, not as your own translation." }));
+              useBtn.disabled = true;
+            });
+            draftBox.appendChild(useBtn);
+          }
+          draftBox.style.display = "";
+          compareBtn.disabled = true;
+        });
+        translationBox.appendChild(compareBtn);
+        translationBox.appendChild(draftBox);
+      }
     }
     card.appendChild(translationBox);
 
@@ -791,9 +837,13 @@ async function App(root) {
       else if (mode.kind === "approved") { read_text = mode.text; translation_source = "approved"; }
       else if (mode.kind === "ask" && translationInput.value.trim()) { read_text = translationInput.value.trim(); translation_source = "typed"; }
       else if (mode.kind === "adhoc") { read_text = p.text; translation_source = "typed"; }
+      // Provenance for the review pass: text a speaker accepted from the machine is not the same
+      // evidence as text they wrote. Both default to false and are only true in "ask" mode.
+      const pid = phraseId(p);
       const meta = {
         file, ...base, category: p.category, purpose: s.purpose, take,
         read_text, translation_source,
+        draft_shown: !!state.draftSeen[pid], draft_adopted: !!state.draftAdopted[pid],
         sample_rate: r.sampleRate, duration_ms: r.durationMs, bytes: r.blob.size,
         sha256: await sha256Hex(r.blob), recorded_at: r.recordedAt.toISOString(),
         level: r.level,
@@ -826,7 +876,7 @@ async function App(root) {
   function startSessionPhrasesOnly() {
     const cat = state.settings.category;
     state.sessionPhrases = phraseData.phrases.filter((p) => p.category === cat)
-      .map((p) => ({ key: p.key, version: p.version, text: p.text, category: cat, unmatched: false, translations: p.translations || {} }));
+      .map((p) => ({ key: p.key, version: p.version, text: p.text, category: cat, unmatched: false, translations: p.translations || {}, drafts: p.drafts || {} }));
     // Re-surface any unmatched phrases already recorded so they show in the list.
     state.takes.filter((t) => t.meta.unmatched && t.meta.category === cat).forEach((t) => {
       if (!state.sessionPhrases.some((p) => p.unmatched && p.text === t.meta.phrase_text))
