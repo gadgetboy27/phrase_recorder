@@ -79,12 +79,21 @@ QUALITY BAR
    "You will be awake but numb from the waist down.").
 3. Register: what a midwife would actually say to a frightened patient. Plain, calm, direct.
    Not formal, not literary, not a literal word-for-word rendering of the English.
+   THIS IS THE REQUIREMENT WE CARE MOST ABOUT. Where clinical speech in your language normally
+   borrows English words, use the borrowed word, not the formal native one. Native Tagalog
+   speakers told us they would say "baby", never "sanggol", and that this is true of most
+   clinical vocabulary; our machine drafts get this wrong in exactly that way. The same applies
+   wherever a community code-switches in a hospital. Write what is said aloud on a ward, not
+   what a dictionary or a written health pamphlet would use. If the natural spoken form differs
+   from the formal one, we want the spoken form, and please say so in `notes`.
 4. These are SPOKEN aloud by a synthetic voice and read on a screen. Keep them short and
    natural to say. Avoid abbreviations, numerals where a word is more natural, and anything
    that depends on punctuation to be understood.
 5. Where a language has politeness levels or gendered forms, choose what is appropriate for a
    clinician speaking to an adult patient they do not know, and tell us what you chose.
-6. If a phrase does not work in the target culture, say so in the `notes` column and propose
+6. Where the formal and spoken forms of a word differ, put the spoken form in `translation` and
+   note the formal alternative. A clinician may need to know both.
+7. If a phrase does not work in the target culture, say so in the `notes` column and propose
    what a clinician there would say instead. We would rather change the English than ship a
    translation that lands wrong.
 
