@@ -35,6 +35,18 @@
   #mode.rec { background:var(--amber); color:#fff; border-color:var(--amber); }
   #status { position:fixed; left:0; right:0; bottom:0; padding:4px 14px; font-size:13px; color:var(--muted); background:var(--base); text-align:center; }
   #status.bad { color:#fff; background:var(--brick); }
+  /* Lost-the-Nano overlay. An overlay, not a screen: when it comes back the clinician is still
+     wherever they were, mid-consult, rather than dumped at the language wizard. */
+  #offline { position:fixed; inset:0; z-index:50; background:var(--base); padding:22px 16px; overflow:auto; }
+  #offline h2 { margin:0 0 4px 0; font-size:26px; color:var(--brick); }
+  #offline .sub { color:var(--muted); font-size:15px; margin-bottom:16px; }
+  #offline .ocard { border:1px solid var(--line); border-radius:8px; padding:12px 14px; margin-bottom:12px; background:#fff; text-align:left; }
+  #offline .ocard h3 { margin:0 0 8px 0; font-size:14px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); text-align:left; }
+  #offline .kv { display:flex; justify-content:space-between; gap:12px; font-size:15px; padding:3px 0; }
+  #offline .kv b { font-weight:600; }
+  #offline ol { margin:6px 0 0 18px; padding:0; font-size:15px; line-height:1.55; }
+  #offline button { width:100%; margin-top:8px; }
+  #offline .addr { font-family:ui-monospace,Menlo,monospace; font-size:14px; }
 
   /* ---- screens ---- */
   section.screen { flex:1 1 auto; display:flex; flex-direction:column; padding:6px 14px 30px; overflow:hidden; min-height:0; }
@@ -232,6 +244,25 @@
   </div>
 </div>
 
+<div id="offline" class="hidden">
+  <h2>Can't reach the Nano</h2>
+  <div class="sub" id="offWhen">The iPad is fine — nothing is answering at this address.</div>
+  <div class="ocard"><h3>What this iPad is trying</h3><div class="kv"><span>Address</span><b class="addr" id="offHost">—</b></div>
+    <div class="kv"><span>Last reply</span><b id="offLast">never</b></div></div>
+  <div class="ocard"><h3>Where the Nano was last seen</h3><div class="kv"><span>Network</span><b id="offSsid">unknown</b></div>
+    <div class="kv"><span>Address</span><b class="addr" id="offIp">unknown</b></div></div>
+  <div class="ocard"><h3>Try another address</h3>
+    <div class="sub" style="margin:0 0 6px 0; font-size:13px">Pairing is stored per address, so a different one may ask you to pair again.</div>
+    <div id="offTry"></div>
+    <div class="row" style="margin-top:8px"><input id="offManual" class="grow" placeholder="172.20.10.12" inputmode="decimal"><button class="primary" style="background:var(--steel); width:auto" id="offGo">Go</button></div></div>
+  <div class="ocard"><h3>On the Nano</h3><ol>
+    <li>Is the green power light on? If not, press the power button.</li>
+    <li>On a phone hotspot: open <b>Settings &rsaquo; Personal Hotspot</b> and <b>leave that screen open</b> — iPhones stop advertising the network otherwise, and the Nano cannot find it.</li>
+    <li>Still nothing after 90 s? Power-cycle the Nano with the hotspot screen open.</li>
+  </ol></div>
+  <button class="btn-primary btn-wide" id="offRetry">Try again now</button>
+  <div class="sub" style="text-align:center; margin:10px 0 0 0" id="offCount">retrying…</div>
+</div>
 <div id="status">connecting…</div>
 
 <script>
@@ -261,7 +292,9 @@
     opts = opts || {};
     const q = Object.assign({}, opts.query || {});
     const qs = Object.keys(q).filter((k) => q[k] !== undefined && q[k] !== null && q[k] !== "").map((k) => k + "=" + encodeURIComponent(q[k])).join("&");
-    const r = await fetch(path + (qs ? "?" + qs : ""), { method: opts.method || "GET", headers: { Authorization: "Bearer " + S.token }, body: opts.body || null });
+    // Without a timeout a vanished Nano leaves fetches pending forever and the page looks frozen.
+    // Uploads get longer than reads: a 30 s recording is a real payload over a phone hotspot.
+    const r = await fetch(path + (qs ? "?" + qs : ""), { method: opts.method || "GET", headers: { Authorization: "Bearer " + S.token }, body: opts.body || null, signal: AbortSignal.timeout(opts.body ? 60000 : 12000) });
     if (r.status === 401) { try { localStorage.removeItem("pk_token"); } catch (e) {} location.replace("/setup"); throw new Error("not paired"); }
     const j = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(j.say || j.error || ("HTTP " + r.status));
@@ -705,13 +738,63 @@
 
   // ---- health / status line / resume ----
   function alertStatus(msg) { const s = $("status"); s.textContent = msg; s.classList.add("bad"); setTimeout(health, 4000); }
+  let offSince = 0, nextTry = 0;
+  function lastOk() { try { return JSON.parse(localStorage.getItem("pk_last_ok") || "null"); } catch (e) { return null; } }
+  function ago(t) {
+    if (!t) return "never";
+    const s = Math.round((Date.now() - t) / 1000);
+    return s < 60 ? s + "s ago" : s < 3600 ? Math.round(s / 60) + " min ago" : Math.round(s / 3600) + " h ago";
+  }
+  function showOffline(on) {
+    $("offline").classList.toggle("hidden", !on);
+    if (!on) { offSince = 0; return; }
+    const L = lastOk() || {};
+    $("offHost").textContent = location.host;
+    $("offLast").textContent = ago(L.at);
+    $("offSsid").textContent = L.ssid || "unknown";
+    $("offIp").textContent = L.ip || "unknown";
+    $("offWhen").textContent = offSince ? "No answer for " + ago(offSince).replace(" ago", "") + ". The iPad is fine — nothing is answering at this address."
+                                        : "The iPad is fine — nothing is answering at this address.";
+    const box = $("offTry"); box.innerHTML = "";
+    const here = location.host.split(":")[0];
+    const cands = [];
+    if (here !== "gadgetboy-nano.local") cands.push(["gadgetboy-nano.local", "the Nano's own name — works on any network"]);
+    if (L.ip && L.ip !== here) cands.push([L.ip, "where it was last seen, on " + (L.ssid || "that network")]);
+    if (!cands.length) box.innerHTML = "<div class='sub' style='margin:0; font-size:13px'>No other address to try — use the box below.</div>";
+    for (const [host, why] of cands) {
+      const b = document.createElement("button");
+      b.className = "primary";
+      b.style.background = "var(--steel)";
+      b.innerHTML = "Try <span class='addr'>" + esc(host) + "</span><br><span style='font-size:12px;opacity:.8'>" + esc(why) + "</span>";
+      b.onclick = () => { location.href = "https://" + host + ":8766/"; };
+      box.appendChild(b);
+    }
+  }
+  $("offRetry").onclick = () => { $("offCount").textContent = "checking…"; health(); };
+  $("offGo").onclick = () => { const v = $("offManual").value.trim(); if (v) location.href = "https://" + v.replace(/^https?:\/\//, "").replace(/[:/].*$/, "") + ":8766/"; };
+  setInterval(() => {                                   // countdown so it is visibly still trying
+    if ($("offline").classList.contains("hidden")) return;
+    const s = Math.max(0, Math.round((nextTry - Date.now()) / 1000));
+    $("offCount").textContent = s ? "checking again in " + s + "s" : "checking…";
+  }, 500);
+
   async function health() {
+    nextTry = Date.now() + 10000;
     try {
-      const r = await fetch("/health", { headers: { Authorization: "Bearer " + S.token } }); const h = await r.json();
+      const r = await fetch("/health", { headers: { Authorization: "Bearer " + S.token }, signal: AbortSignal.timeout(8000) }); const h = await r.json();
       const s = $("status"); s.classList.remove("bad");
+      try {                                             // remember where it was, for the offline page
+        localStorage.setItem("pk_last_ok", JSON.stringify({ at: Date.now(), ssid: (h.wifi || {}).ssid, ip: (h.wifi || {}).ip }));
+      } catch (e) {}
+      if (!$("offline").classList.contains("hidden")) showOffline(false);
       const w = h.wifi || {};
       s.textContent = "Nano on " + (w.ssid || "wired") + (w.ip ? " · " + w.ip : "") + "  ·  speech " + (h.whisper && h.piper ? (h.whisper_server ? "✓" : "✓ slow (whisper-server down)") : "✗") + "  ·  translator " + (h.translator ? "✓ " + h.translator : "starting…") + "  ·  db " + (h.db ? "✓" : "✗") + "  ·  this iPad → " + location.host;
-    } catch (e) { const s = $("status"); s.textContent = "Nano not reachable at " + location.host + " — same Wi-Fi?"; s.classList.add("bad"); }
+    } catch (e) {
+      const s = $("status"); s.textContent = "Nano not reachable at " + location.host + " — same Wi-Fi?"; s.classList.add("bad");
+      if (!offSince) offSince = Date.now();
+      // one missed poll is a blip; two in a row (~20 s) means it is really gone
+      if (Date.now() - offSince >= 15000) showOffline(true);
+    }
   }
   setInterval(health, 10000); health();
   document.addEventListener("visibilitychange", () => {
