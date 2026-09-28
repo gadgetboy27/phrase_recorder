@@ -35,9 +35,11 @@ Routes (JSON responses; the panel only reads the first ~60 chars of `say`):
                                (panel_takes.py). Refused without consent=1 or a valid speaker id.
 """
 import hashlib
+import io
 import json
 import re
 import mimetypes
+import shutil
 import signal
 import socket
 import ssl
@@ -47,6 +49,7 @@ import threading
 import time
 import urllib.request
 import wave
+import zipfile
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlparse, parse_qs
@@ -70,6 +73,7 @@ import panel_takes  # noqa: E402
 import panel_drafts  # noqa: E402
 import panel_render  # noqa: E402
 import panel_admin  # noqa: E402
+import push  # noqa: E402  (tools/push.py, deployed alongside: same batch-ingest code the Mac's CLI uses)
 
 # The language table lives in panel_admin; the other modules learn the extra codes/fonts from it.
 panel_drafts.NLLB_CODES.update(panel_admin.NLLB_CODES)
@@ -88,9 +92,10 @@ RUNTIME = Path("/run/phrase-panel")                       # exists when the syst
 MAX_UPLOAD = 60 * 1024 * 1024                             # a WAV from the iPad: ~10 minutes at 48 kHz mono
 # Paths any client may fetch without a device token: the setup page and what it needs, audio/render
 # fetches (their ids are unguessable / their content is what the caller sent), health, pairing.
-PUBLIC_GET = {"/", "/index.html", "/app.js", "/app.css", "/setup", "/setup.html", "/manifest.webmanifest", "/sw.js",
-              "/icon.svg", "/icon-192.png", "/icon-512.png", "/ca.crt", "/health", "/render", "/render/replies"}
-PUBLIC_POST = {"/pair"}
+PUBLIC_GET = {"/", "/index.html", "/app.js", "/app.css", "/setup", "/setup.html", "/check", "/recorder", "/manifest.webmanifest", "/sw.js",
+              "/icon.svg", "/icon-192.png", "/icon-512.png", "/ca.crt", "/health", "/render", "/render/replies",
+              "/phrases", "/phrases.json"}      # read-only phrase/draft list — same trust level as the open /panel/* writes below
+PUBLIC_POST = {"/pair", "/panel/check-draft", "/panel/ingest"}
 AUDIO_IDS = {}                                            # unguessable id -> Path, for GET /audio/<id>
 WHISPER_LOCK = threading.Lock()                           # one Whisper call at a time: partials and finals share the GPU
 AUDIO_DEV = "plughw:0,0"                                # the USB PnP sound device: mic + speaker
@@ -574,9 +579,11 @@ class Handler(BaseHTTPRequestHandler):
         q = {k: v[0] for k, v in parse_qs(u.query).items()}
         if not self.authed(u, q, PUBLIC_GET):
             return
-        if u.path in ("/", "/index.html", "/setup"):    # the iPad client and its setup/pairing page
-            f = WEB / ("setup.html" if u.path == "/setup" else "index.html")
+        if u.path in ("/", "/index.html", "/setup", "/check", "/recorder"):    # the iPad client, setup/pairing, the language check toolbox, and the standalone recorder
+            f = WEB / {"/setup": "setup.html", "/check": "check.html", "/recorder": "recorder.html"}.get(u.path, "index.html")
             return self.send_file(f, "text/html; charset=utf-8") if f.exists() else self.reply(404, {"error": "web client not deployed"})
+        if u.path == "/phrases.json":                    # the standalone recorder's own copy of the deployed phrase list
+            return self.send_file(PHRASES, "application/json", cache="no-cache")
         if u.path in PUBLIC_GET and u.path.count("/") == 1 and "." in u.path and (WEB / u.path[1:]).exists():
             ctype = {"/sw.js": "application/javascript", "/manifest.webmanifest": "application/manifest+json"}.get(u.path)
             return self.send_file(WEB / u.path[1:], ctype, cache="no-cache" if u.path.endswith((".js", ".webmanifest")) else "max-age=86400")
@@ -669,6 +676,60 @@ class Handler(BaseHTTPRequestHandler):
         lang = q.get("lang", "en")
         client = q.get("client") == "1"                  # the caller plays audio itself (iPad)
         try:
+            if action == "check-draft":                               # a native speaker's typed corrections, from the browser check page
+                try:
+                    items = json.loads(body or b"{}").get("items", [])
+                except ValueError:
+                    return self.reply(400, {"say": 'Send JSON: {"items": [{"lang", "key", "text"}, ...]}'})
+                phrases, _ = load_phrases()
+                filed, skipped = 0, []
+                for it in items:
+                    ilang, ikey, itext = (it.get("lang") or "").strip(), (it.get("key") or "").strip(), (it.get("text") or "").strip()
+                    p = phrases.get(ikey)
+                    if not ilang or not itext or not p:
+                        skipped.append(ikey or "?")
+                        continue
+                    panel_drafts.file_check(p, ilang, itext, it.get("tag") or "native-speaker-check")
+                    filed += 1
+                log(f"native-speaker check: {filed} draft(s) filed" + (f", skipped {skipped}" if skipped else ""))
+                return self.reply(200, {"filed": filed, "skipped": skipped})
+            if action == "ingest":                                    # a batch zip from the standalone recorder — same as tools/push.py, over HTTP
+                if len(body) < 4 or body[:2] != b"PK":
+                    return self.reply(400, {"say": "Send a .zip (manifest.json + WAVs)"})
+                try:
+                    zf = zipfile.ZipFile(io.BytesIO(body))
+                    manifest = json.loads(zf.read("manifest.json"))
+                except (zipfile.BadZipFile, KeyError, ValueError):
+                    return self.reply(400, {"say": "Not a valid batch zip — need manifest.json and its WAVs"})
+                batch_id = manifest.get("batch_id", "")
+                if not re.fullmatch(r"[A-Za-z0-9_-]+", batch_id or ""):
+                    return self.reply(400, {"say": "Bad or missing batch_id in manifest.json"})
+                dest = RECORDINGS / batch_id
+                if dest.exists():
+                    return self.reply(409, {"say": f"Batch {batch_id} is already on the Nano"})
+                try:
+                    recs = manifest.get("recordings", [])
+                    for r in recs:
+                        name = Path(r.get("file", "")).name          # strip any path — never trust client-supplied paths
+                        if not re.fullmatch(r"[A-Za-z0-9_.-]+\.wav", name):
+                            return self.reply(400, {"say": f"Bad filename in manifest: {r.get('file')!r}"})
+                        zf.getinfo(name)                              # raises KeyError if the zip doesn't actually have it
+                    dest.mkdir(parents=True)
+                    for r in recs:
+                        (dest / Path(r["file"]).name).write_bytes(zf.read(r["file"]))
+                    (dest / "manifest.json").write_text(json.dumps(manifest, indent=2, ensure_ascii=False))
+                except KeyError as e:
+                    shutil.rmtree(dest, ignore_errors=True)
+                    return self.reply(400, {"say": f"manifest.json lists a file the zip doesn't contain: {e}"})
+                try:
+                    known = push.known_phrases(panel_drafts.DSN)
+                    sql, notes, n_drafts = push.build_insert(manifest, batch_id, known)
+                    push.psql(panel_drafts.DSN, sql)
+                except subprocess.CalledProcessError as e:
+                    return self.reply(500, {"say": "Files saved on the Nano but the database insert failed — tell Henry",
+                                             "detail": (e.stderr or "")[-300:]})
+                log(f"ingested batch {batch_id}: {len(recs)} recording(s), {n_drafts} draft(s)" + (f", unmatched: {notes}" if notes else ""))
+                return self.reply(200, {"say": "Sent to the Nano", "batch": batch_id, "recordings": len(recs), "drafts": n_drafts, "notes": notes})
             if action == "session":
                 sid = panel_drafts.start_session(q.get("src", "en"), q.get("dst", "?"))
                 threading.Thread(target=audio.warm_voices, args=((q.get("src", "en"), q.get("dst", "")),), daemon=True).start()

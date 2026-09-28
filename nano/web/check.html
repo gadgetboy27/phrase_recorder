@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>PhraseKit language check</title>
+<style>
+  :root { --base:#F6F4EF; --panel:#fff; --ink:#1B2621; --muted:#6B7F9E; --sage:#4A7A68; --steel:#6B7F9E; --amber:#B8843C; --alert:#A8432E; --line:#DDD8CE; --warn-bg:#FBF1E1; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--base); color:var(--ink); font:16px/1.5 -apple-system, "Inter", system-ui, sans-serif; }
+  main { max-width:680px; margin:0 auto; padding:20px 16px 80px; }
+  h1 { font-size:24px; margin:0 0 4px; color:var(--sage); }
+  .sub { color:var(--muted); margin:0 0 18px; font-size:14px; max-width:56ch; }
+  .picker { display:flex; gap:10px; align-items:center; margin-bottom:16px; flex-wrap:wrap; }
+  select { font:inherit; font-size:16px; padding:9px 12px; border:1px solid var(--line); border-radius:10px; background:var(--panel); color:var(--ink); }
+  .count { font-size:13px; color:var(--muted); }
+  .banner { background:var(--warn-bg); border:1px solid #E7D2A6; border-radius:10px; padding:10px 14px; font-size:13px; margin-bottom:18px; }
+  .banner b { color:var(--amber); }
+  .how { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:12px 14px; margin-bottom:20px; font-size:14px; }
+  .how ol { margin:6px 0 0; padding-left:18px; } .how li { margin:3px 0; }
+  h2.group { font-size:12px; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); font-weight:700;
+    margin:26px 0 10px; display:flex; align-items:center; gap:10px; }
+  h2.group::after { content:""; flex:1; height:1px; background:var(--line); }
+  .q { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:14px 16px; margin-bottom:12px; }
+  .q.done { border-color:var(--sage); }
+  .key { font-size:11px; font-weight:600; color:var(--muted); font-variant-numeric:tabular-nums; }
+  .en { font-size:18px; margin:4px 0 8px; }
+  .draft { background:#F3EFE4; border:1px solid var(--line); border-radius:8px; padding:8px 10px; margin-bottom:10px; }
+  .draft .dlabel { font-size:10px; text-transform:uppercase; letter-spacing:.06em; color:var(--amber); font-weight:700; margin-bottom:2px; }
+  .draft .dtext { font-size:16px; }
+  .none { font-size:13px; color:var(--muted); font-style:italic; margin-bottom:10px; }
+  label.fl { display:block; font-size:12px; color:var(--muted); margin-bottom:4px; }
+  input[type=text] { width:100%; font:inherit; font-size:16px; padding:9px 11px; border:1px solid var(--line);
+    border-radius:8px; background:var(--panel); color:var(--ink); }
+  input[type=text]:focus-visible { outline:2px solid var(--sage); outline-offset:1px; }
+  .sent { font-size:14px; }
+  .sent b { color:var(--sage); }
+  .sent a { color:var(--steel); font-size:12px; margin-left:8px; cursor:pointer; }
+  .foot { position:sticky; bottom:0; background:var(--base); border-top:1px solid var(--line); padding:12px 0; margin-top:26px; }
+  button { font:inherit; font-weight:600; font-size:15px; padding:12px 18px; border-radius:10px; cursor:pointer;
+    background:var(--sage); color:#fff; border:0; }
+  button:disabled { opacity:.5; }
+  .status { font-size:13px; color:var(--muted); margin-top:8px; min-height:1.4em; }
+  .status.ok { color:var(--sage); } .status.err { color:var(--alert); }
+  nav.kit { font-size:12px; text-align:center; padding:6px 0; background:var(--ink); }
+  nav.kit a { color:#fff; text-decoration:none; margin:0 10px; }
+</style>
+</head>
+<body>
+<nav class="kit"><a href="/">Panel</a>&middot;<a href="/recorder">Recorder</a></nav>
+<main>
+  <h1>Language check</h1>
+  <p class="sub">Pick a language. Every phrase below has no human-approved translation yet — what you type is filed as a draft for review, never spoken automatically.</p>
+
+  <div class="picker">
+    <select id="lang"></select>
+    <span class="count" id="count"></span>
+  </div>
+
+  <div class="how">
+    <b>How to use this</b>
+    <ol>
+      <li>Read the <b>English</b> aloud, then ask the question.</li>
+      <li>Type what they actually say — their words, not a tidied-up version.</li>
+      <li>Tap <b>Send</b> for each one, or fill in a few and tap <b>Send all answered</b> at the bottom.</li>
+    </ol>
+  </div>
+
+  <div id="banner"></div>
+  <div id="lists"><p class="none">Loading…</p></div>
+
+  <div class="foot">
+    <button id="sendall">Send all answered</button>
+    <div class="status" id="status"></div>
+  </div>
+</main>
+<script>
+(function(){
+  // Known chrF++ scores against professional translations (tools/calibrate.py --report), and languages
+  // where the machine has no useful baseline at all. Both static: refresh by re-running calibrate.py.
+  var SCORE = {hi:59.4, es:59.4, tl:55.7, ar:42.3, prs:38.5, fa:31.1};
+  var NO_MACHINE = {
+    to: "NLLB-200 has no Tongan at all — every line here must be translated from scratch.",
+    mi: "Machine output is weak and macrons are unreliable — treat any draft as noise.",
+    sm: "Machine output is weak — treat any draft as noise."
+  };
+  var STORE_KEY = "phrasekit_check_v1";
+
+  function store() {
+    try { return JSON.parse(localStorage.getItem(STORE_KEY) || "{}"); } catch (e) { return {}; }
+  }
+  function saveField(lang, key, val) {
+    try {
+      var s = store(); s[lang] = s[lang] || {};
+      if (val) s[lang][key] = val; else delete s[lang][key];
+      localStorage.setItem(STORE_KEY, JSON.stringify(s));
+    } catch (e) {}
+  }
+  function clearField(lang, key) { saveField(lang, key, ""); }
+  function savedFor(lang) { return store()[lang] || {}; }
+
+  var langSel = document.getElementById("lang");
+  var lists = document.getElementById("lists");
+  var banner = document.getElementById("banner");
+  var countEl = document.getElementById("count");
+  var statusEl = document.getElementById("status");
+  var currentLang = new URLSearchParams(location.search).get("lang") || "";
+  var currentPhrases = [];
+
+  function esc(s) { return (s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;"); }
+
+  function renderBanner(lang) {
+    var bits = [];
+    if (NO_MACHINE[lang]) bits.push(NO_MACHINE[lang]);
+    else if (SCORE[lang] != null) bits.push("The machine scored " + SCORE[lang] + "/100 against professional translations for this language. That measures formal written text — it does not mean any single draft below is safe to speak.");
+    else bits.push("No calibration score on file for this language yet (tools/calibrate.py). Treat every draft below as unverified.");
+    banner.innerHTML = '<div class="banner"><b>Before you start</b> — ' + esc(bits.join(" ")) + '</div>';
+  }
+
+  function card(p, lang, hideDraft) {
+    var id = lang + "-" + p.key;
+    var saved = savedFor(lang)[p.key] || "";
+    var draftHtml = "";
+    if (!hideDraft) {
+      draftHtml = p.draft
+        ? '<div class="draft"><div class="dlabel">On the device now</div><div class="dtext">' + esc(p.draft) + '</div></div>'
+        : '<p class="none">The machine has nothing for this one — needs a from-scratch translation.</p>';
+    }
+    return '<div class="q" data-key="' + p.key + '">' +
+      '<span class="key">' + esc(p.key) + '</span>' +
+      '<p class="en">' + esc(p.text) + '</p>' +
+      draftHtml +
+      '<label class="fl" for="' + id + '">What you would actually say</label>' +
+      '<div class="row">' +
+      '<input type="text" id="' + id + '" value="' + esc(saved) + '">' +
+      '</div></div>';
+  }
+
+  function render(data, lang) {
+    currentPhrases = data.phrases;
+    renderBanner(lang);
+    var pending = data.phrases.filter(function(p){ return !p.translation; });
+    countEl.textContent = pending.length + " of " + data.phrases.length + " phrases still need a human translation.";
+    if (!pending.length) {
+      lists.innerHTML = '<p class="none">Nothing left to check for this language — every phrase has an approved translation.</p>';
+      return;
+    }
+    var replies = pending.filter(function(p){ return p.category === "patient_replies"; });
+    var rest = pending.filter(function(p){ return p.category !== "patient_replies"; });
+    var html = "";
+    if (rest.length) {
+      html += '<h2 class="group">Clinician-facing phrases</h2>';
+      rest.forEach(function(p){ html += card(p, lang, false); });
+    }
+    if (replies.length) {
+      html += '<h2 class="group">Patient replies — ask fresh, don’t show the machine draft</h2>' +
+              '<p class="none" style="margin-top:-4px">These are what the patient taps themselves — they must sound like the patient speaking, not a translation.</p>';
+      replies.forEach(function(p){ html += card(p, lang, true); });
+    }
+    lists.innerHTML = html;
+    lists.querySelectorAll("input[type=text]").forEach(function(el){
+      el.addEventListener("input", function(){
+        var key = el.closest(".q").getAttribute("data-key");
+        saveField(lang, key, el.value);
+      });
+    });
+  }
+
+  function load(lang) {
+    lists.innerHTML = '<p class="none">Loading…</p>';
+    fetch("/phrases?lang=" + encodeURIComponent(lang) + "&src=en&raw=1")
+      .then(function(r){ return r.json(); })
+      .then(function(data){
+        if (!langSel.options.length) {
+          data.languages.filter(function(l){ return l.code !== "en"; }).forEach(function(l){
+            var o = document.createElement("option"); o.value = l.code; o.textContent = l.label; langSel.appendChild(o);
+          });
+          langSel.value = lang;
+        }
+        render(data, lang);
+      })
+      .catch(function(){ lists.innerHTML = '<p class="none">Could not reach the Nano — check you’re on the same Wi-Fi.</p>'; });
+  }
+
+  function submit(items, opts) {
+    if (!items.length) { statusEl.textContent = "Nothing filled in yet."; statusEl.className = "status"; return; }
+    statusEl.textContent = "Sending…"; statusEl.className = "status";
+    fetch("/panel/check-draft", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({items: items})
+    })
+      .then(function(r){ return r.json(); })
+      .then(function(out){
+        items.forEach(function(it){
+          clearField(it.lang, it.key);
+          var q = lists.querySelector('.q[data-key="' + it.key + '"]');
+          if (q) {
+            q.classList.add("done");
+            var input = q.querySelector("input[type=text]");
+            input.parentNode.innerHTML = '<p class="sent">Sent: <b>' + esc(it.text) + '</b> ✓ <a data-key="' + it.key + '">edit</a></p>';
+          }
+        });
+        lists.querySelectorAll("a[data-key]").forEach(function(a){
+          a.onclick = function(){
+            var q = a.closest(".q"); q.classList.remove("done");
+            var lang = langSel.value;
+            var p = currentPhrases.filter(function(x){ return x.key === a.getAttribute("data-key"); })[0];
+            var hideDraft = p && p.category === "patient_replies";
+            q.outerHTML = card(p, lang, hideDraft);
+          };
+        });
+        statusEl.textContent = out.filed + " draft" + (out.filed === 1 ? "" : "s") + " filed on the Nano" +
+          (out.skipped && out.skipped.length ? " — skipped " + out.skipped.join(", ") : "") + ".";
+        statusEl.className = "status ok";
+        if (opts && opts.reload) load(langSel.value);
+      })
+      .catch(function(){ statusEl.textContent = "Could not reach the Nano — nothing was sent."; statusEl.className = "status err"; });
+  }
+
+  langSel.addEventListener("change", function(){
+    history.replaceState(null, "", "?lang=" + langSel.value);
+    load(langSel.value);
+  });
+
+  document.getElementById("sendall").addEventListener("click", function(){
+    var lang = langSel.value;
+    var items = [];
+    lists.querySelectorAll(".q:not(.done) input[type=text]").forEach(function(el){
+      if (el.value.trim()) items.push({lang: lang, key: el.closest(".q").getAttribute("data-key"), text: el.value.trim()});
+    });
+    submit(items);
+  });
+
+  // First load: figure out the language list via English, then settle on the requested/default language.
+  fetch("/phrases?lang=en&src=en&raw=1").then(function(r){ return r.json(); }).then(function(data){
+    data.languages.filter(function(l){ return l.code !== "en"; }).forEach(function(l){
+      var o = document.createElement("option"); o.value = l.code; o.textContent = l.label; langSel.appendChild(o);
+    });
+    currentLang = currentLang && data.languages.some(function(l){ return l.code === currentLang; }) ? currentLang : langSel.options[0].value;
+    langSel.value = currentLang;
+    load(currentLang);
+  });
+})();
+</script>
+</body>
+</html>

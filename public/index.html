@@ -6,8 +6,12 @@
 <title>Audio sample recorder</title>
 </head>
 <body>
+<nav id="nano-nav"></nav>
 <div id="root"></div>
 <style>
+  #nano-nav { display: none; font-size: 12px; text-align: center; padding: 6px 0; background: #2E4A40; }
+  #nano-nav a { color: #fff; text-decoration: none; margin: 0 10px; }
+  #nano-nav a:active { opacity: .7; }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { margin: 0; height: 100%; }
   .app {
@@ -140,8 +144,15 @@
 <script>
 // Phrase recorder v2 — see docs/data-contract.md. Everything this file
 // produces (WAV, filename, manifest.json, zip) is specified there.
-const APP_VERSION = "2.2.0";
+const APP_VERSION = "2.3.0";
 const MANIFEST_VERSION = 1;
+// If this page is being served by the Nano itself (or is otherwise reachable on the same LAN/
+// browser as it), /health answers and we can offer direct delivery + links to its other tools.
+// On Cloudflare Pages there is no /health, so this quietly resolves to null and nothing changes.
+const nanoHealth = fetch("/health", { cache: "no-cache" }).then((r) => {
+  if (!r.ok || !(r.headers.get("content-type") || "").includes("json")) return null;
+  return r.json();
+}).catch(() => null);
 const CONSENT_TEXT_VERSION = 1;
 const CONSENT_TEXT =
   "I confirm I am recording my own voice reading clinical phrases for the local " +
@@ -913,13 +924,15 @@ async function App(root) {
 
     const status = el("div", { class: "status", text: state.takes.length ? "Preparing export…" : "Nothing to export yet." });
     const exportBtn = el("button", { class: "btn-primary btn-wide", text: "Export batch", disabled: true });
+    const nanoBtn = el("button", { class: "btn-secondary btn-wide", text: "Send to the Nano now", style: "display:none" });
     const sizeNote = el("div", { class: "filename" });
     const clearRow = el("div", { class: "row tight", style: "display:none" });
-    const clearBtn = el("button", { class: "btn-danger-link", text: "Batch is safely on the Mac — clear it from this phone" });
+    const clearBtn = el("button", { class: "btn-danger-link", text: "Batch is safely delivered — clear it from this phone" });
     clearRow.appendChild(clearBtn);
 
     card.appendChild(status);
     card.appendChild(el("div", { class: "row" }, [exportBtn]));
+    card.appendChild(el("div", { class: "row" }, [nanoBtn]));
     card.appendChild(sizeNote);
     card.appendChild(clearRow);
     card.appendChild(el("div", { class: "footer-note", text:
@@ -934,7 +947,27 @@ async function App(root) {
       sizeNote.textContent = z.name + " · " + (z.blob.size / (1024 * 1024)).toFixed(1) + " MB";
       status.textContent = "Ready to export.";
       exportBtn.disabled = false;
+      nanoHealth.then((data) => { if (data) nanoBtn.style.display = ""; });
     }).catch((err) => { status.textContent = "Couldn't build the export: " + err.message; });
+
+    nanoBtn.addEventListener("click", async () => {
+      const z = state.zip;
+      if (!z) return;
+      nanoBtn.disabled = true;
+      status.textContent = "Sending to the Nano…";
+      try {
+        const r = await fetch("/panel/ingest", { method: "POST", body: z.blob });
+        const out = await r.json();
+        if (!r.ok) throw new Error(out.say || ("HTTP " + r.status));
+        state.exported = true;
+        status.textContent = "Sent to the Nano: " + out.recordings + " recording" + (out.recordings === 1 ? "" : "s") +
+          (out.drafts ? ", " + out.drafts + " translation draft" + (out.drafts === 1 ? "" : "s") : "") + ".";
+        clearRow.style.display = "flex";
+      } catch (err) {
+        status.textContent = "Couldn't reach the Nano (" + err.message + ") — use Export instead.";
+        nanoBtn.disabled = false;
+      }
+    });
 
     exportBtn.addEventListener("click", async () => {
       const z = state.zip;
@@ -974,6 +1007,13 @@ async function App(root) {
 }
 
 App(document.getElementById("root"));
+
+nanoHealth.then((data) => {
+  if (!data) return;
+  const nav = document.getElementById("nano-nav");
+  nav.innerHTML = '<a href="/">Panel</a>·<a href="/check">Language check</a>';
+  nav.style.display = "block";
+});
 </script>
 </body>
 </html>

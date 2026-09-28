@@ -113,6 +113,18 @@ def pending():
     return len(_pending)
 
 
+def file_check(phrase, lang, text, tag):
+    """A native speaker's typed correction (from the browser check page), filed as a draft exactly
+    like a machine draft — it still needs tools/translations.py approve before it ships."""
+    q = push.sql_str
+    try:
+        push.psql(DSN, f"""INSERT INTO golden_set (language_pair, source_text, approved_translation, category, phrase_key, phrase_version, status, created_by)
+            VALUES ({q('en-' + lang)}, {q(phrase['text'])}, {q(text)}, {q(phrase['category'])}, {q(phrase['key'])}, {phrase['version']}, 'draft', {q(tag)})
+            ON CONFLICT (phrase_key, phrase_version, language_pair, approved_translation) DO NOTHING""")
+    except subprocess.CalledProcessError as e:
+        print("check draft not filed:", (e.stderr or "")[-200:], flush=True)
+
+
 def request(phrases, lang, lang_label, llama_up):
     """Queue drafts for every phrase in `phrases` lacking an approved `lang` translation. Non-blocking."""
     global _worker

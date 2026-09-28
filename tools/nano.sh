@@ -53,6 +53,7 @@ panel() {
   scp -q nano/panel_api.py nano/panel_takes.py nano/panel_drafts.py nano/panel_render.py nano/panel_admin.py nano/asr_worker.py \
          tools/push.py tools/export_phrases.py public/phrases.json "$NANO_SSH:panel/"
   scp -q nano/web/* "$NANO_SSH:panel/web/"
+  scp -q public/index.html "$NANO_SSH:panel/web/recorder.html"    # the same standalone recorder, served locally too (/recorder)
   # The Waveshare's device token (nano/secrets.yaml) is registered as a paired device, and the Nano's own CA +
   # server certificate are (re)issued so iPads can use https://…:8766 — see nano/panel_admin.py.
   tok=$(sed -n 's/^panel_token: *"\(.*\)".*/\1/p' nano/secrets.yaml 2>/dev/null)
