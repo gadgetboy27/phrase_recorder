@@ -78,8 +78,11 @@
   const am = document.getElementById("addrmsg");
   if (/^\d+\.\d+\.\d+\.\d+$/.test(host)) am.innerHTML = "You are on the Nano's numeric address, which changes between networks. Pair and add the icon from <code>https://gadgetboy-nano.local:8766/setup</code> instead — that name works at home, on a phone hotspot and on the PhraseKit hotspot, with one pairing.";
   else am.textContent = "This address works on every network the Nano joins — one icon, one pairing.";
+  am.innerHTML += "<br><small>Pairing is stored for <b>" + location.host + "</b> only.</small>";
 
-  document.getElementById("pair").addEventListener("click", async () => {
+  const btn = document.getElementById("pair");
+  btn.addEventListener("click", async () => {
+    if (btn.dataset.done) return;                     // already spent the code on this page
     const code = document.getElementById("code").value.trim(), name = document.getElementById("name").value.trim();
     if (code.length !== 6) { s2msg.textContent = "Six digits, please."; return; }
     s2msg.className = "msg"; s2msg.textContent = "Pairing…";
@@ -88,7 +91,14 @@
       const j = await r.json();
       if (!r.ok || !j.token) { s2msg.textContent = j.say || "Pairing failed."; return; }
       try { localStorage.setItem("pk_token", j.token); localStorage.setItem("pk_name", name || "iPad"); } catch (e) {}
-      s2.classList.add("done"); s2msg.textContent = "Paired as “" + (name || "iPad") + "”."; s2msg.className = "msg ok";
+      s2.classList.add("done"); s2msg.textContent = "Paired as “" + (name || "iPad") + "” — opening the app…"; s2msg.className = "msg ok";
+      // A code is spent the instant it works (redeem_pair_code unlinks pair.json: one code, one device),
+      // so leaving the operator sitting here invites a second tap that can ONLY 403 "Wrong or expired
+      // code" — which reads as a failure when the pairing in fact succeeded. Go into the app instead.
+      // Only ever redirect after a FRESH pairing, never on load from a stored token: the app sends a 401
+      // back to /setup, and a redirect on load would make that an infinite loop.
+      btn.dataset.done = "1"; btn.disabled = true;
+      setTimeout(() => location.replace("/"), 700);
     } catch (e) { s2msg.textContent = "Could not reach the Nano: " + e.message; }
   });
 })();
