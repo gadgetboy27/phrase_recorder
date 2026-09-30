@@ -777,7 +777,7 @@
       box.appendChild(b);
     }
   }
-  $("offRetry").onclick = () => { $("offCount").textContent = "checking…"; health(); };
+  $("offRetry").onclick = () => { $("offCount").textContent = "checking…"; health(true); };
   $("offGo").onclick = () => { const v = $("offManual").value.trim(); if (v) location.href = "https://" + v.replace(/^https?:\/\//, "").replace(/[:/].*$/, "") + ":8766/"; };
   setInterval(() => {                                   // countdown so it is visibly still trying
     if ($("offline").classList.contains("hidden")) return;
@@ -785,14 +785,18 @@
     $("offCount").textContent = s ? "checking again in " + s + "s" : "checking…";
   }, 500);
 
-  async function health() {
-    nextTry = Date.now() + 10000;
+  // The hotspot's first packet after an idle spell is slow — the Nano's first call measures 3-10 s,
+  // and mDNS alone has taken 1.2 s when the name has gone cold. So a COLD poll (first load, back from
+  // background, manual retry) gets a long budget; steady-state polls keep the tight 8 s.
+  async function health(cold) {
+    nextTry = Date.now() + (cold ? 22000 : 10000);
     try {
-      const r = await fetch("/health", { headers: { Authorization: "Bearer " + S.token }, signal: AbortSignal.timeout(8000) }); const h = await r.json();
+      const r = await fetch("/health", { headers: { Authorization: "Bearer " + S.token }, signal: AbortSignal.timeout(cold ? 20000 : 8000) }); const h = await r.json();
       const s = $("status"); s.classList.remove("bad");
       try {                                             // remember where it was, for the offline page
         localStorage.setItem("pk_last_ok", JSON.stringify({ at: Date.now(), ssid: (h.wifi || {}).ssid, ip: (h.wifi || {}).ip }));
       } catch (e) {}
+      offSince = 0;                                     // a reply ends the run of failures, overlay up or not
       if (!$("offline").classList.contains("hidden")) showOffline(false);
       const w = h.wifi || {};
       s.textContent = "Nano on " + (w.ssid || "wired") + (w.ip ? " · " + w.ip : "") + "  ·  speech " + (h.whisper && h.piper ? (h.whisper_server ? "✓" : "✓ slow (whisper-server down)") : "✗") + "  ·  translator " + (h.translator ? "✓ " + h.translator : "starting…") + "  ·  db " + (h.db ? "✓" : "✗") + "  ·  this iPad → " + location.host;
@@ -803,11 +807,11 @@
       if (Date.now() - offSince >= 15000) showOffline(true);
     }
   }
-  setInterval(health, 10000); health();
+  setInterval(health, 10000); health(true);
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState !== "visible") return;
     if (actx && actx.state !== "running") { try { actx.close(); } catch (e) {} actx = null; }   // iOS kills it during sleep; rebuild on the next tap
-    if (S.data) { health(); loadPhrases().catch(() => {}); }
+    if (S.data) { health(true); loadPhrases().catch(() => {}); }   // iOS suspended the radio — treat as cold
   });
 
   // ---- go ----
