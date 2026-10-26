@@ -144,7 +144,7 @@
 <script>
 // Phrase recorder v2 — see docs/data-contract.md. Everything this file
 // produces (WAV, filename, manifest.json, zip) is specified there.
-const APP_VERSION = "2.3.0";
+const APP_VERSION = "2.3.1";
 const MANIFEST_VERSION = 1;
 // If this page is being served by the Nano itself (or is otherwise reachable on the same LAN/
 // browser as it), /health answers and we can offer direct delivery + links to its other tools.
@@ -672,6 +672,16 @@ async function App(root) {
     } else {
       const existing = takesFor(p).length;
       card.appendChild(el("div", { class: "progress", text: "Phrase " + (state.idx + 1) + " of " + state.sessionPhrases.length + (existing ? " · " + existing + " take" + (existing > 1 ? "s" : "") + " saved" : "") }));
+      // Jump straight to any phrase in this category without leaving the recorder.
+      const jumpSel = el("select", { class: "phrase-jump" });
+      state.sessionPhrases.forEach((sp, i) => {
+        const n = takesFor(sp).length;
+        const t = sp.text.length > 60 ? sp.text.slice(0, 57) + "…" : sp.text;
+        jumpSel.appendChild(el("option", { value: String(i), text: (i + 1) + ". " + t + (n ? "  ✓" + n : "") }));
+      });
+      jumpSel.value = String(state.idx);
+      jumpSel.addEventListener("change", () => { discardPending(); state.idx = Number(jumpSel.value); render(); });
+      card.appendChild(jumpSel);
       if (mode.kind === "approved") {
         // Approved target-language text exists: read that; English shown for reference.
         card.appendChild(el("div", { class: "phrase-text", lang: s.language, text: mode.text }));
