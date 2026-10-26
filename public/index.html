@@ -46,6 +46,8 @@
     background-repeat: no-repeat; background-position: right 10px center;
   }
   select:disabled, input:disabled { color: #8A8474; }
+  .pick-this { border: 2px solid #2E4A40; box-shadow: 0 0 0 4px rgba(46,74,64,.18); background-color: #FFFDF6; }
+  .pick-hint { font-size: 12px; color: #2E4A40; font-weight: 600; margin-top: 12px; }
   textarea { min-height: 72px; resize: vertical; line-height: 1.4; }
   .phrase-source { font-size: 13px; color: #6B6455; margin: 6px 2px 0 2px; line-height: 1.4; }
   .phrase-source b { color: #2E4A40; font-weight: 600; }
@@ -144,7 +146,7 @@
 <script>
 // Phrase recorder v2 — see docs/data-contract.md. Everything this file
 // produces (WAV, filename, manifest.json, zip) is specified there.
-const APP_VERSION = "2.3.1";
+const APP_VERSION = "2.3.2";
 const MANIFEST_VERSION = 1;
 // If this page is being served by the Nano itself (or is otherwise reachable on the same LAN/
 // browser as it), /health answers and we can offer direct delivery + links to its other tools.
@@ -606,8 +608,14 @@ async function App(root) {
     card.appendChild(speakerTypeSel);
     card.appendChild(el("label", { text: "Purpose" }));
     card.appendChild(purposeSel);
+    const picking = state.pickCategory; state.pickCategory = false;
+    if (picking) {
+      card.appendChild(el("div", { class: "pick-hint", text: "Pick a different category below — that's what “Change” does." }));
+      catSel.classList.add("pick-this");
+    }
     card.appendChild(el("label", { text: "Category to work through" }));
     card.appendChild(catSel);
+    if (picking) setTimeout(() => { catSel.scrollIntoView({ block: "center", behavior: "smooth" }); }, 0);
     card.appendChild(consentBox);
     card.appendChild(errBox);
     card.appendChild(el("div", { class: "row" }, [startBtn]));
@@ -663,7 +671,7 @@ async function App(root) {
 
     card.appendChild(el("div", { class: "session-bar" }, [
       el("span", { class: "meta", text: s.language.toUpperCase() + " · " + s.speakerId + " · " + catLabel }),
-      el("button", { class: "btn-link", text: "Change", onclick: () => { discardPending(); state.screen = "setup"; render(); } }),
+      el("button", { class: "btn-link", text: "Change", onclick: () => { discardPending(); state.screen = "setup"; state.pickCategory = true; render(); } }),
     ]));
 
     if (!p) {
